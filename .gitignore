@@ -1,0 +1,7 @@
+site_strategies/
+sql/
+.venv/
+.vscode/
+
+.env
+log.json

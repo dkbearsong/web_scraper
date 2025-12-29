@@ -1,0 +1,11 @@
+{
+    "url": "https://example.com",
+    "strategy": "generic|product|article|selector",
+    "selectors": {"title": "h1.title", "price": ".price"}, 
+    "config": {
+        "max_depth": 1,
+        "max_pages": 10,
+        "delay": 1.0,
+        "follow_links": false
+    }
+}
