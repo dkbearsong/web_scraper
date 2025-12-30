@@ -80,7 +80,7 @@ class DataPuller:
             FROM job
             JOIN company ON company.id = job.company_id
             JOIN office on office.id = job.office_id
-            WHERE job.job_name = {item['job_title']} AND company.company_name = {item['company']} AND office.location = {item['location']};
+            WHERE job.job_name = {item['job_title']} AND company.company_name = {item['company']} AND office.location = {item['location']} AND job.date_added >= CURRENT_DATE - INTERVAL '3 months';
             """)
 
             if dup_record:
@@ -121,7 +121,7 @@ class DataPuller:
 
         return
 
-    async def pull_data_DB (self, query: str = "") -> dict:
+    async def pull_data_db (self, query: str = "") -> dict:
         '''
         Allows running of database queries, specifically select statements to pull data
 
@@ -130,7 +130,15 @@ class DataPuller:
             query = str (SQL select statement)
         '''
         response = await self.cursor.execute(query) # type: ignore
-        return response.json()
+        return response.json() # Need to see if it comes back as list or json/dict
+
+    def insert_data_db (self, query: str = ""):
+        self.cursor.execute(query)
+        return
+
+    def commit_data_db(self):
+        self.conn.commit()
+        return
 
     def close_connection(self):
         self.cursor.close()
