@@ -1,24 +1,20 @@
 import aiohttp
 import json
-import psycopg2
 import csv
 import requests
+
+# Modules
+from app.postgres_mgr import PostgresManager
+from app.make_db import make_db
 
 ws_micro_host = "http://localhost"
 ws_micro_port = "5052"
 
 class DataPuller:
-    def __init__(self, host: str = ws_micro_host, port: str = ws_micro_port, db_config: dict = {}):
+    def __init__(self, host: str = "localhost", port: str = "5432", user: str = "postgres", password: str = "", dbname: str = "postgres"):
         self.host = host
         self.port = port
-        self.conn = psycopg2.connect(
-            dbname=db_config['dbname'],
-            user=db_config['user'],
-            password=db_config['password'],
-            host=self.host,
-            port=self.port
-        )
-        self.cursor = self.conn.cursor()
+        self.conn = PostgresManager(host, int(port), user, password, dbname=dbname)
 
     async def pull_data(self, source: str, payload: dict = {}) -> dict:
         url = f"{self.host}:{self.port}/{source}/scrape"
@@ -56,92 +52,72 @@ class DataPuller:
         input format:
             data = [
                 {
-                    "job_title": str}
+                    "job_title": str,
                     "company": str,
-                    "city": str,
-                    "state": str,
+                    "location": str,
                     "link": str
                 }
             ]
-            db_config = {
-                'dbname': str,
-                'user': str,
-                'password': str,
-                'host': str,
-                'port': int
-            }
         '''
         
         for item in data:
-            # Need checks for existing entries to avoid duplicates
-            # Start with checking if job, company, and location exist as a record
-            dup_record = self.cursor.execute(f"""
-            SELECT job.job_name,company.company_name, office.location
-            FROM job
-            JOIN company ON company.id = job.company_id
-            JOIN office on office.id = job.office_id
-            WHERE job.job_name = {item['job_title']} AND company.company_name = {item['company']} AND office.location = {item['location']} AND job.date_added >= CURRENT_DATE - INTERVAL '3 months';
-            """)
+            # Get or insert company
+            companies = self.conn.search("company", {"company_name": item['company']})
+            if companies:
+                company_id = companies[0][0]
+            else:
+                result = self.conn.insert("company", {"company_name": item['company']}, returning=["id"])
+                company_id = result[0][0]
 
-            if dup_record:
+            # Get or insert office
+            offices = self.conn.search("office", {"company_id": company_id, "location": item['location']})
+            if offices:
+                office_id = offices[0][0]
+            else:
+                result = self.conn.insert("office", {"company_id": company_id, "location": item['location']}, returning=["id"])
+                office_id = result[0][0]
+
+            # Check for duplicate job within 3 months
+            query = """
+            SELECT 1 FROM job 
+            WHERE job_title = %s AND company_id = %s AND office_id = %s 
+            AND date_added >= CURRENT_DATE - INTERVAL '3 months'
+            """
+            rows = self.conn.execute_sql(query, (item['job_title'], company_id, office_id), fetch=True)
+            if rows:
                 continue  # Skip duplicate
 
-            # If not, check if company exists, if not insert company
-            company = self.cursor.execute(f"""
-            SELECT id FROM company WHERE company_name = {item['company']};
-            """)
-
-            if not company:
-                self.cursor.execute("""
-                INSERT INTO company (company_name) VALUES (%s)
-                """, (item['company'],))
-                company_id = self.cursor.lastrowid
-
-            # Then check if office record for company and location exists, if not insert office
-            office = self.cursor.execute(f"""
-            SELECT company.company_name, office.city_name, office.state
-            FROM office 
-            JOIN company ON company.id = office.company_id 
-            WHERE company.company_name = {item['company']} AND office.location = {item['location']};
-            """)
-            if not office:
-                self.cursor.execute("""
-                INSERT INTO office (company_id, location) VALUES (%s, %s, %s)
-                """, (company_id, item['location']))
-                office_id = self.cursor.lastrowid
-
-
-            # Finally insert job record linked to company and office
-            self.cursor.execute("""
-            INSERT INTO jobs (job_title, company, location, link)
-            VALUES (%s, %s, %s, %s)
-            """, (item['job_title'], item['company'], item['location'], item['link']))
-
-        self.conn.commit()
+            # Insert job
+            self.conn.insert("job", {
+                "job_title": item['job_title'], 
+                "company_id": company_id, 
+                "office_id": office_id, 
+                "link": item['link']
+            })
 
         return
 
-    async def pull_data_db (self, query: str = "") -> dict:
+    def pull_data_db(self, query: str):
         '''
         Allows running of database queries, specifically select statements to pull data
 
         input format:
-            source = str (name of microservice)
             query = str (SQL select statement)
+        returns: list of tuples
         '''
-        response = await self.cursor.execute(query) # type: ignore
-        return response.json() # Need to see if it comes back as list or json/dict
+        rows = self.conn.execute_sql(query, fetch=True)
+        return rows
 
-    def insert_data_db (self, query: str = ""):
-        self.cursor.execute(query)
+    def insert_data_db(self, query: str):
+        self.conn.execute_sql(query)
         return
 
     def commit_data_db(self):
-        self.conn.commit()
+        # Note: PostgresManager commits automatically in execute_sql, but keeping for compatibility
+        pass
         return
 
     def close_connection(self):
-        self.cursor.close()
         self.conn.close()
         return
     

@@ -2,6 +2,7 @@ import os
 from dotenv import load_dotenv
 import json
 from docx import Document
+import asyncio
 
 # Modules
 from pull_data import DataPuller
@@ -175,7 +176,7 @@ async def main():
     dp.commit_data_db()
 
     del titles_to_process, score_list, scrape_sum_list, s_companies, strategy, site_strategies, data, query
-
+    """
     # Get the unranked summaries
     summaries_to_process = dp.pull_data_DB(sql_read_queries['unranked_summaries'])
 
@@ -201,8 +202,10 @@ async def main():
         dp.insert_data_db(query)
     dp.commit_data_db()
 
+    """
+
     return
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
 

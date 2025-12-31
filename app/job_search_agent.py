@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 import aiohttp
 import asyncio
-from call_Ollama import OllamaClient
+from app.call_Ollama import OllamaClient
 
 class JobSearchAgent:
     def __init__(self, client: OllamaClient):

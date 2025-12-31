@@ -1,6 +1,6 @@
 import json
 import aiohttp
-from call_Ollama import OllamaClient
+from app.call_Ollama import OllamaClient
 import asyncio
 from dotenv import load_dotenv
 import os
