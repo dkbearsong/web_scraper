@@ -50,6 +50,23 @@ class PostgresManager:
             raise RuntimeError("Failed to establish database connection.")
         return self._conn
     
+    def database_exists(self, dbname: str) -> bool:
+        """
+        Check whether a database exists.
+        Must connect to default_db (usually 'postgres').
+        """
+        temp_conn = psycopg2.connect(**dict(self.conn_params, dbname=self.default_db))
+        temp_conn.autocommit = True
+        try:
+            with temp_conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1 FROM pg_database WHERE datname = %s",
+                    (dbname,),
+                )
+                return cur.fetchone() is not None
+        finally:
+            temp_conn.close()
+
     def create_database(self, new_dbname: str):
         """
         Create a database if it doesn't already exist.

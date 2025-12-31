@@ -15,6 +15,10 @@ class DataPuller:
         self.host = host
         self.port = port
         self.conn = PostgresManager(host, int(port), user, password, dbname=dbname)
+        self.dbname = dbname
+        if self.conn.database_exists(self.dbname) == False:
+            make_db()
+            self.conn.connect(self.dbname)
 
     async def pull_data(self, source: str, payload: dict = {}) -> dict:
         url = f"{self.host}:{self.port}/{source}/scrape"
