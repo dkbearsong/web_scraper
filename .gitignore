@@ -1,7 +1,12 @@
 site_strategies/
+job_page_strategy/
 sql/
 .venv/
 .vscode/
+.idea/
+__pycache__/
+app/__pycache__/
 
 .env
 log.json
+job_sites.csv

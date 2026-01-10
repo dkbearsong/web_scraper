@@ -1,5 +1,6 @@
 import psycopg2
 from psycopg2 import sql
+from psycopg2.extras import DictCursor
 from typing import Dict, Iterable, Optional, Any, List, Tuple
 
 
@@ -72,9 +73,6 @@ class PostgresManager:
         Create a database if it doesn't already exist.
         Connects first to default_db with provided credentials.
         """
-        params = dict(self.conn_params, dbname=self.default_db)
-        params["port"] = str(params["port"])
-        temp_conn = psycopg2.connect(**params) # type: ignore
         temp_conn = psycopg2.connect(**dict(self.conn_params, dbname=self.default_db)) # type: ignore
         temp_conn.autocommit = True
         try:
@@ -89,14 +87,14 @@ class PostgresManager:
         finally:
             temp_conn.close()
 
-    def execute_sql(self, statement: str, params: Optional[Iterable[Any]] = None, dbname: Optional[str] = None, fetch: bool = False) -> Optional[List[Tuple]]:
+    def execute_sql(self, statement: str, params: Optional[Iterable[Any]] = None, dbname: Optional[str] = None, fetch: bool = False) -> Optional[List[Dict[str, Any]]]:
         """
-        Execute arbitrary SQL. Returns rows if fetch=True. For statement, use %s placeholders for params.
+        Execute arbitrary SQL. Returns rows as list of dicts if fetch=True. For statement, use %s placeholders for params.
         NOTE: Use for ad-hoc SQL; prefer specialized methods for inserts/updates/selects.
 
         """
         conn = self._get_conn(dbname)
-        with conn.cursor() as cur:
+        with conn.cursor(cursor_factory=DictCursor) as cur:
             cur.execute(statement, params)
             if fetch:
                 rows = cur.fetchall()
@@ -245,6 +243,7 @@ class PostgresManager:
             base = sql.SQL("{} LIMIT {}").format(base, sql.Literal(limit))
 
         conn = self._get_conn(dbname)
+        print(f"base: {base} | params: {params}")
         with conn.cursor() as cur:
             cur.execute(base, params)
             rows = cur.fetchall()

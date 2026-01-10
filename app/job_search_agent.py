@@ -18,28 +18,20 @@ class JobSearchAgent:
                     to determine if the job would be a good fit for the user.
 
                     For each request:
-                    - You will receive ONE Criterion description, a Score Range, a Job Title, a Job History, and Skills.
+                    - You will receive a Job Title, a Job History, and Skills.
                     - Input will be as shown below:
                         Job Title: <string>,
                         Job History: <list>,
                         Skills: <list>,
-                        Criterion: <string>,
-                        Score Range: <string>       
                     - Demonstrate careful analysis and consideration of multiple angles.
-                    - Review the *Job Title* and the user's *Job History* and *Skills* closely against the *Criterion* before scoring
-                     the job title.
-                    - Be very harsh and critical in your analysis. If the job title matches the lower end of the criteria for scoring,
-                     always err on the lower side. If the job title matches as described by the criteria, only then should you give it
-                     a high score
+                    - Review the *Job Title* and the user's *Job History* and *Skills* closely before scoring the job title.
+                    - Score how well the job title matches the user's experience and skills on a scale of 1 to 100, where 1 is a poor match and 100 is an excellent match.
                     - Score the title match 5 times, then return the average score.
-                    - Score must be within the given *Score Range*.
                     - Output MUST be valid JSON, matching this schema exactly:
                     {
-                        'criterion': <string>,
-                        'score': <int>,        // out of max_score
+                        'score': <int>,
                     }
-                    - Double check your response. Verify it follows the output JSON format exactly. Verify you are including values 
-                    for 'criterion' and for 'score'
+                    - Double check your response. Verify it follows the output JSON format exactly. Verify you are including values for 'criterion' and for 'score'
                     """
         session = aiohttp.ClientSession()
         client = OllamaClient(session, model="gemma3:1b", system_message=SYSTEM_MESSAGE)
@@ -57,13 +49,57 @@ class JobSearchAgent:
         Returns:
             int: score for the Job Title
         """
+        json_schema = {
+            "type": "object",
+            "properties": {
+                "score": {"type": "number"}
+            },
+            "required": "score"
+        }
+        
+        valid = False
+        user_prompt = f"""
+        User Input:
+        Job Title: { jt }
+        Job History: { pt } 
+        Skills: { sk } 
+        Return JSON only.
+        """
+        invalid = False
+        invalid_count = 0
+        score = 0
         bad_titles = json.loads(os.getenv("BAD_TITLES"))
-        total_score = 100
-        for b in bad_titles: # Deducts points to the total for title matches in bad_titles
-            if re.search(b, jt):
-                total_score -= 50
-                break
-        return total_score
+
+        while not valid: # Verifies the reply contained good data. If not tries again
+            if not invalid:
+                result = await self.client.call(user_prompt, json_schema, 0.2, 0.5, 5, mt=1024)
+                print(f"Response received: {result}")
+            else:
+                print("Invalid response, retrying...")
+                result = await self.client.call(f"The previous response did not match the outlined criteria for JSON formatting. Retry the response following the JSON schema outlined in the system message." + user_prompt, json_schema, 0.7, 0.7, 15, mt=1024)
+
+            try:
+                if (isinstance(result.get('score'), int) or isinstance(result.get('final_score'), int)):
+                    print("Valid format." + str(result))
+                    valid = True
+                    score = int(result.get('score') if 'score' in result else result.get('final_score'))
+                    for b in bad_titles: # Deducts points to the total for title matches in bad_titles
+                        if re.search(b, jt):
+                            score -= 50
+                            break
+                else:
+                    print("Invalid format." + str(result))
+                    invalid = True
+                    invalid_count += 1
+                    if invalid_count > 3:
+                        print("Too many invalid responses, ending review and continuing on to next job.")
+                        valid = True
+                        invalid_count = 0
+            except KeyError as e:
+                print(e)
+                print("KeyError, retrying...")
+                continue
+        return score
 
     async def clear_ollama(self): # unloads the model from Ollama
         await self.client.unload()

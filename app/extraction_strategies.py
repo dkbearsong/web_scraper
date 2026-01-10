@@ -353,3 +353,20 @@ class ArticleStrategy(ExtractionStrategy):
                 else:
                     result.append(content)
         return result
+    
+class StrategyFactory:
+    """Factory for creating extraction strategies"""
+    
+    @staticmethod
+    def create(strategy_type: str, **kwargs) -> ExtractionStrategy:
+        if strategy_type not in ['generic', 'product', 'article', 'selector']:
+            raise ValueError(f"Unknown strategy: {strategy_type}")
+        
+        if strategy_type == 'generic':
+            return GenericStrategy()
+        elif strategy_type == 'product':
+            return ProductStrategy()
+        elif strategy_type == 'article':
+            return ArticleStrategy()
+        else:  # strategy_type == 'selector'
+            return SelectorStrategy(kwargs.get('selectors', {}))

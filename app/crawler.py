@@ -17,14 +17,15 @@ from app.extraction_strategies import ExtractionStrategy, GenericStrategy, Selec
 
 class WebCrawler:
     """Main crawler engine"""
-    
+
     def __init__(self, config: CrawlConfig, strategy: ExtractionStrategy):
         self.config = config
         self.strategy = strategy
         self.visited = set()
         self.results = []
         self.session = requests.Session()
-        
+        self.scraper = cloudscraper.create_scraper()
+
         headers = {
             'User-Agent': config.user_agent
         }
@@ -54,10 +55,8 @@ class WebCrawler:
                 # Handle Cloudflare protection
                 scraper = cloudscraper.create_scraper()
                 response = scraper.get(url, timeout=self.config.timeout)
-            
+
             soup = BeautifulSoup(response.content, 'html.parser')
-            with open('log.json', 'w') as f:
-                json.dump({'url': url, 'soup': soup.prettify()}, f)
             data = self.strategy.extract(soup, url)
             
             links = []
@@ -71,6 +70,12 @@ class WebCrawler:
                 links=links
             )
             self.results.append(result)
+            
+            # Follow links if configured
+            if self.config.follow_links:
+                for link in links[:5]:  # Limit links per page
+                    if len(self.results) < self.config.max_pages:
+                        self._crawl_recursive(link, depth + 1)
             
             # Follow links if configured
             if self.config.follow_links:
@@ -143,14 +148,25 @@ class JSWebCrawler(WebCrawler):
                             action.get('pause_time', 1.0),
                             action.get('max_scrolls', 10)
                         )
+                    elif action_type == 'click_until_gone':
+                        selector = action.get('selector')
+                        max_clicks = action.get('max_clicks', 10)
+                        pause_time = action.get('pause_time', 1.0)
+                        if selector:
+                            renderer.click_until_gone(selector, max_clicks, pause_time)
+                    elif action_type == 'load_all':
+                        method = action.get('method', 'scroll')
+                        selector = action.get('selector')
+                        max_iterations = action.get('max_iterations', 10)
+                        pause_time = action.get('pause_time', 1.0)
+                        renderer.load_all_content(method, selector, max_iterations, pause_time)
                     elif action_type == 'script':
                         renderer.execute_script(action.get('code'))
                     elif action_type == 'wait':
                         time.sleep(action.get('seconds', 1))
                 
                 # Get final HTML
-                if renderer.driver:
-                    html = renderer.driver.page_source
+                html = renderer.driver.page_source
             
             # Parse and extract
             soup = BeautifulSoup(html, 'html.parser')

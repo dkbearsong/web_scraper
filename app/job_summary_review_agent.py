@@ -67,11 +67,13 @@ class JobSumReviewAgent:
         criteria = [
             {
                 "message": """
-                Compare the following resume and job description. Give a rating for how well the resume matches the job description out of 100%. For areas where the resume does not match, give reasoning, suggestions on how to fit better, and examples for those suggestions. 
+                Compare the following resume and job description. Give a rating for how well the resume matches the job description out of 100%. 
+                For areas where the resume does not match, give reasoning, suggestions on how to fit better, and examples for those suggestions. 
                 
                 Steps:
                 1. Extract the required and nice to have technical skills from the job description (Qualifications/Requirements).
-                2. For each skill, check if the resume has an exact match, a clear synonym/abbreviation, or same tech family. Mark as MATCH or NO MATCH.
+                2. For each skill, check if the resume has an exact match, a clear synonym/abbreviation, or same tech family. 
+                Mark as MATCH or NO MATCH.
                    - Examples: AWS ↔ Amazon Web Services; JS ↔ JavaScript; Docker ↔ Containerization; REST APIs ↔ HTTP API dev.
                    - Do not match unrelated items (e.g., AWS ≠ Internal Network administration).
                    - If a skill is abstract or a soft skill, err on the user's favor for that skill
@@ -82,6 +84,8 @@ class JobSumReviewAgent:
                    - 20–39% = 15-25
                    - 0–19% = 0-15
                 Final Score: NN
+                ***NOTE***  Do not worry about matching the exact verbage, or being overskilled. This resume is an overall comprehensive list of 
+                skills, work, and projects. Match whether the resume shows the user has the correct experience for the role. A tailored resume can come later.
                 Respond only in the specified JSON format.
                 """,
                 "score_range": "0-70"},
@@ -114,7 +118,7 @@ class JobSumReviewAgent:
             Criterion: { i['message']}
             Job Description: { js }
             Resume: { res }
-            Score Range: { i['score_range'] }       
+            Score Range: { i['score_range'] }
             Return JSON only.
             """
             invalid = False
@@ -128,7 +132,7 @@ class JobSumReviewAgent:
 
                 try:
                     if (isinstance(result.get('score'), int) or isinstance(result.get('final_score'), int)) and result.get('reasoning'):
-                        print("Valid format." + str(result))
+                        print("Valid format.")
                         valid = True
                         results.append(result)
                     else:
@@ -147,8 +151,7 @@ class JobSumReviewAgent:
                     continue
         total_score = 0
         reasoning = ''
-        # print(results)
-        # Need to add in way to send in reasoning as well as total score. Currently only doing total score.
+        # print(f"Results: {results}")
         for j in results:
             if 'raw_text' in j: # in case the reply comes back as raw text, try to extract and convert to JSON
                 print('Raw Text!')
@@ -158,7 +161,7 @@ class JobSumReviewAgent:
                 total_score += int(j_converted['score'])
                 reasoning += j_converted['reasoning'] + "\n\n"
             else:
-                print("Result: " + str(j))
+                # print(f"Result: {str(j)[:30]}...")
                 total_score += int(j.get('score')) if 'score' in j else int(j.get('final_score'))# Adds the score to the total
                 reasoning += json.dumps(j['reasoning']) + "\n\n"
         print(total_score)

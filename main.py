@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify
 import requests
 from bs4 import BeautifulSoup
 import time
+from random import random
 from dataclasses import asdict
 
 # Modules
@@ -15,6 +16,7 @@ from app.extraction_strategies import ExtractionStrategy, GenericStrategy, Selec
 from app.page_analyzer import PageAnalyzer
 from app.crawler import WebCrawler, JSWebCrawler
 from app.javascript_renderer import JavaScriptRenderer
+from app.extract_paginated import paginated
 
 app = Flask(__name__)
 
@@ -202,9 +204,32 @@ def quick_extract():
         results = crawler.crawl()
         
         if results:
+            extracted_data = results[0].data
+            # Transform to list of dicts
+            if isinstance(extracted_data, dict):
+                if 'data' in extracted_data and isinstance(extracted_data['data'], list) and extracted_data['data'] and isinstance(extracted_data['data'][0], dict):
+                    # Already list of dicts
+                    extracted_data = extracted_data['data']
+                else:
+                    # Dict of lists -> list of dicts
+                    keys = list(extracted_data.keys())
+                    if keys:
+                        lengths = [len(v) if isinstance(v, list) else 1 for v in extracted_data.values()]
+                        max_len = max(lengths) if lengths else 1
+                        # Pad shorter lists
+                        for k in keys:
+                            if isinstance(extracted_data[k], list):
+                                if len(extracted_data[k]) < max_len:
+                                    extracted_data[k].extend([None] * (max_len - len(extracted_data[k])))
+                            else:
+                                extracted_data[k] = [extracted_data[k]] * max_len
+                        extracted_data = [dict(zip(keys, vals)) for vals in zip(*[extracted_data[k] for k in keys])]
+                    else:
+                        extracted_data = []
             return jsonify({
                 'success': True,
-                'data': asdict(results[0])
+                'data': extracted_data,
+                'status_code': results[0].status_code
             })
         else:
             return jsonify({'error': 'No data extracted'}), 500
@@ -229,9 +254,12 @@ def extract_js():
                 "timeout": 10
             },
             "actions": [
-                {"type": "click", "selector": ".load-more"},
-                {"type": "scroll", "max_scrolls": 5},
-                {"type": "script", "code": "document.querySelector('.modal').remove()"}
+                {"type": "click", "selector": ".tab-button"},
+                {"type": "scroll", "max_scrolls": 5, "pause_time": 1.5},
+                {"type": "click_until_gone", "selector": ".load-more", "max_clicks": 20, "pause_time": 2},
+                {"type": "load_all", "method": "scroll|click", "selector": ".load-more", "max_iterations": 10},
+                {"type": "script", "code": "document.querySelector('.modal').remove()"},
+                {"type": "wait", "seconds": 2}
             ],
             "headless": true
         }
@@ -249,12 +277,14 @@ def extract_js():
         # Extract JS config
         wait_config = js_config.get('wait')
         actions = js_config.get('actions', [])
-        headless = js_config.get('headless', True)
+        headless = js_config.get('headless', True)        
+        iframe_selector = js_config.get('iframe')  # NEW: Extract iframe selector
         
         # Render page with Selenium
         with JavaScriptRenderer(headless=headless) as renderer:
-            # Load page and wait for content
-            html = renderer.render_page(url, wait_config)
+
+            # Load page and wait for content (with optional iframe switch)
+            html = renderer.render_page(url, wait_config, iframe_selector)  # CHANGED: Pass iframe_selector
             
             # Perform actions if specified
             for action in actions:
@@ -263,12 +293,29 @@ def extract_js():
                 if action_type == 'click':
                     selector = action.get('selector')
                     if selector:
-                        renderer.click_element(selector)
+                        use_js = action.get('use_js', False)
+                        dismiss_overlays = action.get('dismiss_overlays', True)
+                        renderer.click_element(selector, use_js, dismiss_overlays)
                 
                 elif action_type == 'scroll':
                     max_scrolls = action.get('max_scrolls', 10)
                     pause_time = action.get('pause_time', 1.0)
                     renderer.scroll_to_bottom(pause_time, max_scrolls)
+
+                elif action_type == 'click_until_gone':
+                    selector = action.get('selector')
+                    max_clicks = action.get('max_clicks', 10)
+                    pause_time = action.get('pause_time', 1.0)
+                    if selector:
+                        clicks = renderer.click_until_gone(selector, max_clicks, pause_time)
+                        print(f"Clicked '{selector}' {clicks} times")
+
+                elif action_type == 'load_all':
+                    method = action.get('method', 'scroll')
+                    selector = action.get('selector')
+                    max_iterations = action.get('max_iterations', 10)
+                    pause_time = action.get('pause_time', 1.0)
+                    renderer.load_all_content(method, selector, max_iterations, pause_time)
                 
                 elif action_type == 'script':
                     script = action.get('code')
@@ -277,10 +324,11 @@ def extract_js():
                 
                 elif action_type == 'wait':
                     # Additional wait after previous actions
-                    time.sleep(action.get('seconds', 1))
+                    rand_time = 3 * random()
+                    time.sleep(action.get('seconds', rand_time))
             
             # Get final rendered HTML
-            html = renderer.render_page(url, wait_config)
+            html = renderer.driver.page_source
         
         # Parse with BeautifulSoup
         soup = BeautifulSoup(html, 'html.parser')
@@ -295,11 +343,34 @@ def extract_js():
         # Extract data
         extracted_data = strategy.extract(soup, url)
         
+        # Transform to list of dicts
+        if isinstance(extracted_data, dict):
+            if 'data' in extracted_data and isinstance(extracted_data['data'], list) and extracted_data['data'] and isinstance(extracted_data['data'][0], dict):
+                # Already list of dicts
+                extracted_data = extracted_data['data']
+            else:
+                # Dict of lists -> list of dicts
+                keys = list(extracted_data.keys())
+                if keys:
+                    lengths = [len(v) if isinstance(v, list) else 1 for v in extracted_data.values()]
+                    max_len = max(lengths) if lengths else 1
+                    # Pad shorter lists
+                    for k in keys:
+                        if isinstance(extracted_data[k], list):
+                            if len(extracted_data[k]) < max_len:
+                                extracted_data[k].extend([None] * (max_len - len(extracted_data[k])))
+                        else:
+                            extracted_data[k] = [extracted_data[k]] * max_len
+                    extracted_data = [dict(zip(keys, vals)) for vals in zip(*[extracted_data[k] for k in keys])]
+                else:
+                    extracted_data = []
+        
         return jsonify({
             'success': True,
             'url': url,
             'rendered': True,
-            'data': extracted_data
+            'data': extracted_data,
+            'status_code': 200
         })
         
     except Exception as e:
@@ -366,6 +437,57 @@ def crawl_js():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/extract-paginated', methods=['POST'])
+def extract_paginated():
+    """
+    Extract data from paginated results (numbered pages)
+    
+    Request body:
+    {
+        "url_template": "https://example.com/jobs?page={page}",
+        "start_page": 1,
+        "end_page": 20,
+        "strategy": "selector",
+        "selectors": {...},
+        "js_config": {...},  // optional - use if pages are JS-rendered
+        "delay": 1.5
+    }
+    
+    Or for clicking through pages:
+    {
+        "url": "https://example.com/jobs",
+        "pagination": {
+            "method": "click",
+            "next_selector": "button.next",
+            "max_pages": 20,
+            "wait_after_click": 2
+        },
+        "strategy": "selector",
+        "selectors": {...},
+        "js_config": {...}
+    }
+    """
+    pag_obj = paginated()
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'Request body is required'}), 400
+        
+        # Determine pagination method
+        if 'url_template' in data:
+            # URL-based pagination
+            return pag_obj._extract_url_pagination(data)
+        elif 'pagination' in data and data['pagination'].get('method') == 'click':
+            # Click-based pagination
+            return pag_obj._extract_click_pagination(data)
+        else:
+            return jsonify({'error': 'Either url_template or pagination config is required'}), 400
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5052, debug=True)

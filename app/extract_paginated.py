@@ -1,0 +1,366 @@
+from flask import jsonify
+from bs4 import BeautifulSoup
+import requests
+import time
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.common.by import By
+from selenium.common.exceptions import TimeoutException, NoSuchElementException
+from selenium.webdriver.support import expected_conditions as EC
+from typing import Dict, Any
+from app.javascript_renderer import JavaScriptRenderer
+from app.extraction_strategies import StrategyFactory
+
+class paginated:
+    def _extract_url_pagination(self, data: Dict) -> Any:
+        """Handle URL-based pagination (page numbers in URL)"""
+        url_template = data['url_template']
+        start_page = data.get('start_page', 1)
+        end_page = data.get('end_page', 10)
+        delay = data.get('delay', 1.0)
+        
+        # Check if JS rendering is needed
+        use_js = 'js_config' in data
+        js_config = data.get('js_config', {})
+        
+        # Create strategy
+        strategy_type = data.get('strategy', 'generic')
+        strategy = StrategyFactory.create(
+            strategy_type,
+            selectors=data.get('selectors', {})
+        )
+        
+        all_results = []
+        
+        if use_js:
+            # Use Selenium for JS-rendered pages
+            headless = js_config.get('headless', True)
+            wait_config = js_config.get('wait')
+            actions = js_config.get('actions', [])
+            
+            with JavaScriptRenderer(headless=headless) as renderer:
+                for page_num in range(start_page, end_page + 1):
+                    try:
+                        url = url_template.format(page=page_num)
+                        
+                        # Render page
+                        html = renderer.render_page(url, wait_config)
+                        
+                        # Perform actions
+                        for action in actions:
+                            self._perform_action(renderer, action)
+                        
+                        # Get final HTML
+                        html = renderer.driver.page_source
+                        soup = BeautifulSoup(html, 'html.parser')
+                        
+                        # Extract data
+                        page_data = strategy.extract(soup, url)
+                        
+                        all_results.append({
+                            'page': page_num,
+                            'url': url,
+                            'data': page_data
+                        })
+                        
+                        time.sleep(delay)
+                        
+                    except Exception as e:
+                        all_results.append({
+                            'page': page_num,
+                            'url': url,
+                            'error': str(e)
+                        })
+        else:
+            # Use requests for static pages
+            session = requests.Session()
+            session.headers.update({'User-Agent': 'CustomCrawler/1.0'})
+            
+            for page_num in range(start_page, end_page + 1):
+                try:
+                    url = url_template.format(page=page_num)
+                    
+                    response = session.get(url, timeout=10)
+                    soup = BeautifulSoup(response.content, 'html.parser')
+                    
+                    # Extract data
+                    page_data = strategy.extract(soup, url)
+                    
+                    all_results.append({
+                        'page': page_num,
+                        'url': url,
+                        'status_code': response.status_code,
+                        'data': page_data
+                    })
+                    
+                    time.sleep(delay)
+                    
+                except Exception as e:
+                    all_results.append({
+                        'page': page_num,
+                        'url': url,
+                        'error': str(e)
+                    })
+        
+        # Aggregate data from all pages
+        aggregated_data = []
+        for page in all_results:
+            if 'data' in page:
+                page_data = page['data']
+                # Transform to list of dicts
+                if isinstance(page_data, dict):
+                    keys = list(page_data.keys())
+                    if keys:
+                        lengths = [len(v) if isinstance(v, list) else 1 for v in page_data.values()]
+                        max_len = max(lengths) if lengths else 1
+                        for k in keys:
+                            if isinstance(page_data[k], list):
+                                if len(page_data[k]) < max_len:
+                                    page_data[k].extend([None] * (max_len - len(page_data[k])))
+                            else:
+                                page_data[k] = [page_data[k]] * max_len
+                        page_list = [dict(zip(keys, vals)) for vals in zip(*[page_data[k] for k in keys])]
+                    else:
+                        page_list = []
+                elif isinstance(page_data, list):
+                    page_list = page_data
+                else:
+                    page_list = [page_data] if page_data else []
+                aggregated_data.extend(page_list)
+        
+        return jsonify({
+            'success': True,
+            'data': aggregated_data,
+            'total_pages': len(all_results)
+        })
+        
+    def _extract_click_pagination(self, data: Dict) -> Any:
+        """Handle click-based pagination (clicking Next button)"""
+        url = data['url']
+        pagination_config = data['pagination']
+        
+        next_selector = pagination_config.get('next_selector')
+        max_pages = pagination_config.get('max_pages', 10)
+        wait_after_click = pagination_config.get('wait_after_click', 2)
+        use_js_click = pagination_config.get('use_js', True)  # Default to JS click for pagination
+        
+        js_config = data.get('js_config', {})
+        headless = js_config.get('headless', True)
+        wait_config = js_config.get('wait')
+        initial_actions = js_config.get('actions', [])
+        
+        # Create strategy
+        strategy_type = data.get('strategy', 'generic')
+        strategy = StrategyFactory.create(
+            strategy_type,
+            selectors=data.get('selectors', {})
+        )
+        
+        all_results = []
+        
+        with JavaScriptRenderer(headless=headless) as renderer:
+            # Load initial page
+            html = renderer.render_page(url, wait_config)
+            
+            # Perform initial actions
+            for action in initial_actions:
+                self._perform_action(renderer, action)
+            
+            # Extract from each page
+            for page_num in range(1, max_pages + 1):
+                try:
+                    # Wait a bit for page to stabilize
+                    time.sleep(1)
+
+                    # Get a unique identifier from the current page (like first job title)
+                    # This helps us detect when content actually changes
+
+                    # NEW - Checks actual job containers
+                    old_content_marker = renderer.driver.execute_script(
+                        "const containers = document.querySelectorAll('div.position-container'); "
+                        "return containers.length > 0 ? Array.from(containers).map(c => c.textContent.trim().substring(0, 50)).join('|') : document.body.innerText.substring(0, 200);"
+                    )
+
+                    # Get current page HTML
+                    html = renderer.driver.page_source
+                    soup = BeautifulSoup(html, 'html.parser')
+                    
+                    # Extract data
+                    page_data = strategy.extract(soup, renderer.driver.current_url)
+                    
+                    all_results.append({
+                        'page': page_num,
+                        'url': renderer.driver.current_url,
+                        'data': page_data
+                    })
+                
+                    print(f"Extracted page {page_num}, found data: {len(str(page_data))} characters")
+                
+                    # Try to click next button
+                    if page_num < max_pages:
+                        try:
+                            # Scroll to bottom first to ensure pagination is visible
+                            renderer.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                            time.sleep(0.5)
+                            
+                            # Find the element
+                            element = WebDriverWait(renderer.driver, 5).until(
+                                EC.presence_of_element_located((By.CSS_SELECTOR, next_selector))
+                            )
+                            
+                            # Check if button is disabled (no more pages)
+                            element_class = element.get_attribute('class') or ''
+                            parent_class = ''
+                            try:
+                                parent = element.find_element(By.XPATH, '..')
+                                parent_class = parent.get_attribute('class') or ''
+                            except:
+                                pass
+                            
+                            is_disabled = (element.get_attribute('disabled') or 
+                                        'is-disabled' in element_class or 
+                                        'disabled' in element_class or
+                                        'is-disabled' in parent_class)
+                            if is_disabled:
+                                print(f"Next button is disabled on page {page_num}, stopping")
+                                break
+                            
+                            # Scroll element into center of viewport
+                            renderer.driver.execute_script(
+                                "arguments[0].scrollIntoView({behavior: 'instant', block: 'center', inline: 'center'});", 
+                                element
+                            )
+                            time.sleep(0.5)
+                            
+                            # Try to dismiss any overlays
+                            renderer._dismiss_common_overlays()
+                            
+                            print(f"Clicking next button for page {page_num + 1}...")
+                            
+                            # Use JavaScript click (more reliable for pagination)
+                            if use_js_click:
+                                renderer.driver.execute_script("arguments[0].click();", element)
+                            else:
+                                # Try regular click with fallback
+                                try:
+                                    element = WebDriverWait(renderer.driver, 3).until(
+                                        EC.element_to_be_clickable((By.CSS_SELECTOR, next_selector))
+                                    )
+                                    element.click()
+                                except Exception:
+                                    # Fall back to JS click
+                                    element = renderer.driver.find_element(By.CSS_SELECTOR, next_selector)
+                                    renderer.driver.execute_script("arguments[0].click();", element)
+                            
+                            # Initial wait for navigation
+                            time.sleep(wait_after_click)
+                            
+                            # Verify content actually changed
+                            content_changed = False
+                            max_retries = 10  # Increased retries
+                            for retry in range(max_retries):
+                                try:
+                                    new_content_marker = renderer.driver.execute_script(
+                                        "const containers = document.querySelectorAll('div.position-container'); "
+                                        "return containers.length > 0 ? Array.from(containers).map(c => c.textContent.trim().substring(0, 50)).join('|') : document.body.innerText.substring(0, 200);"
+                                    )
+                                    
+                                    if new_content_marker != old_content_marker:
+                                        # Content changed, we're on a new page
+                                        print(f"Content changed after {retry + 1} checks, moving to page {page_num + 1}")
+                                        content_changed = True
+                                        break
+                                    else:
+                                        # Content hasn't changed yet, wait a bit more
+                                        time.sleep(0.5)
+                                except:
+                                    time.sleep(0.5)
+                            
+                            if not content_changed:
+                                print(f"Warning: Content didn't change after clicking next on page {page_num}, stopping")
+                                break
+                            
+                        except (TimeoutException, NoSuchElementException) as e:
+                            # No more pages
+                            print(f"No next button found on page {page_num}: {e}")
+                            break
+                        except Exception as e:
+                            print(f"Error clicking next button on page {page_num}: {e}")
+                            break
+                            
+                except Exception as e:
+                    all_results.append({
+                        'page': page_num,
+                        'error': str(e)
+                    })
+                    break
+        
+        # Aggregate data from all pages
+        aggregated_data = []
+        for page in all_results:
+            if 'data' in page:
+                page_data = page['data']
+                # Transform to list of dicts
+                if isinstance(page_data, dict):
+                    keys = list(page_data.keys())
+                    if keys:
+                        lengths = [len(v) if isinstance(v, list) else 1 for v in page_data.values()]
+                        max_len = max(lengths) if lengths else 1
+                        for k in keys:
+                            if isinstance(page_data[k], list):
+                                if len(page_data[k]) < max_len:
+                                    page_data[k].extend([None] * (max_len - len(page_data[k])))
+                            else:
+                                page_data[k] = [page_data[k]] * max_len
+                        page_list = [dict(zip(keys, vals)) for vals in zip(*[page_data[k] for k in keys])]
+                    else:
+                        page_list = []
+                elif isinstance(page_data, list):
+                    page_list = page_data
+                else:
+                    page_list = [page_data] if page_data else []
+                aggregated_data.extend(page_list)
+        
+        return jsonify({
+            'success': True,
+            'data': aggregated_data,
+            'total_pages': len(all_results)
+        })
+
+    def _perform_action(self, renderer: JavaScriptRenderer, action: Dict):
+        """Helper to perform a single action"""
+        action_type = action.get('type')
+        
+        if action_type == 'click':
+            use_js = action.get('use_js', False)
+            dismiss_overlays = action.get('dismiss_overlays', True)
+            renderer.click_element(action.get('selector'), use_js, dismiss_overlays)
+        elif action_type == 'scroll':
+            renderer.scroll_to_bottom(
+                action.get('pause_time', 1.0),
+                action.get('max_scrolls', 10)
+            )
+        elif action_type == 'click_until_gone':
+            selector = action.get('selector')
+            if selector:
+                use_js = action.get('use_js', False)
+                dismiss_overlays = action.get('dismiss_overlays', True)
+                renderer.click_until_gone(
+                    selector,
+                    action.get('max_clicks', 10),
+                    action.get('pause_time', 1.0),
+                    use_js,
+                    dismiss_overlays
+                )
+        elif action_type == 'load_all':
+            renderer.load_all_content(
+                action.get('method', 'scroll'),
+                action.get('selector'),
+                action.get('max_iterations', 10),
+                action.get('pause_time', 1.0)
+            )
+        elif action_type == 'script':
+            script = action.get('code')
+            if script:
+                renderer.execute_script(script)
+        elif action_type == 'wait':
+            time.sleep(action.get('seconds', 1))

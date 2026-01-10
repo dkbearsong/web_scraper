@@ -51,7 +51,7 @@ class JavaScriptRenderer:
         
         return driver
     
-    def render_page(self, url: str, wait_config: Optional[Dict] = None) -> str:
+    def render_page(self, url: str, wait_config: Optional[Dict] = None, iframe_selector: Optional[str] = None) -> str:
         """
         Render a page and return HTML after JavaScript execution
         
@@ -63,6 +63,7 @@ class JavaScriptRenderer:
                     "value": 5 or "css_selector" or "return document.readyState === 'complete'",
                     "timeout": 10
                 }
+            iframe_selector: Optional CSS selector for iframe to switch into
         """
         if not self.driver:
             raise RuntimeError("Driver not initialized. Use context manager.")
@@ -75,6 +76,17 @@ class JavaScriptRenderer:
         else:
             # Default: wait for page load
             time.sleep(2)
+        
+        # Switch to iframe if specified
+        if iframe_selector:
+            try:
+                iframe = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, iframe_selector))
+                )
+                self.driver.switch_to.frame(iframe)
+                time.sleep(1)  # Wait for iframe content to load
+            except TimeoutException:
+                print(f"Could not find iframe with selector: {iframe_selector}")
         
         # Return rendered HTML
         return self.driver.page_source
@@ -124,19 +136,77 @@ class JavaScriptRenderer:
             raise RuntimeError("Driver not initialized")
         return self.driver.execute_script(script)
     
-    def click_element(self, selector: str):
-        """Click an element (useful for load more buttons, etc.)"""
+    def _dismiss_common_overlays(self):
+        """Attempt to dismiss common overlay elements that might intercept clicks"""
+        overlay_dismissal_scripts = [
+            # Remove common overlay classes
+            "document.querySelectorAll('.modal-backdrop, .overlay, .popup-overlay').forEach(el => el.remove());",
+            # Close modals
+            "document.querySelectorAll('.modal.show, .modal.open').forEach(el => el.classList.remove('show', 'open'));",
+            # Remove fixed position overlays
+            "document.querySelectorAll('[style*=\"position: fixed\"]').forEach(el => { if(el.style.zIndex > 100) el.remove(); });",
+            # Hide body overflow (often set when modals open)
+            "document.body.style.overflow = 'auto';",
+        ]
+        
+        for script in overlay_dismissal_scripts:
+            try:
+                self.driver.execute_script(script)
+            except:
+                pass
+
+    def click_element(self, selector: str, use_js: bool = False, dismiss_overlays: bool = True):
+        """
+        Click an element (useful for load more buttons, etc.)
+        
+        Args:
+            selector: CSS selector for element to click
+            use_js: If True, use JavaScript click instead of Selenium click
+            dismiss_overlays: If True, try to remove common overlays before clicking
+        """
         if not self.driver:
             raise RuntimeError("Driver not initialized")
         
         try:
+            # Optionally dismiss common overlays
+            if dismiss_overlays:
+                self._dismiss_common_overlays()
+            
             element = WebDriverWait(self.driver, self.wait_time).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                EC.presence_of_element_located((By.CSS_SELECTOR, selector))
             )
-            element.click()
-            time.sleep(1)  # Wait for content to load after click
+            
+            # Scroll element into view
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+            time.sleep(0.5)
+            
+            if use_js:
+                # JavaScript click (works when element is intercepted)
+                self.driver.execute_script("arguments[0].click();", element)
+            else:
+                # Try regular click first
+                try:
+                    element = WebDriverWait(self.driver, 5).until(
+                        EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                    )
+                    element.click()
+                except Exception as e:
+                    # Fall back to JavaScript click if intercepted
+                    print(f"Regular click failed, using JS click: {e}")
+                    self.driver.execute_script("arguments[0].click();", element)
+            
+            time.sleep(1)
+            
         except (TimeoutException, NoSuchElementException) as e:
             print(f"Could not click element {selector}: {e}")
+            try:
+                element = WebDriverWait(self.driver, self.wait_time).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                )
+                element.click()
+                time.sleep(1)  # Wait for content to load after click
+            except (TimeoutException, NoSuchElementException) as e:
+                print(f"Could not click element {selector}: {e}")
     
     def scroll_to_bottom(self, pause_time: float = 1.0, max_scrolls: int = 10):
         """Scroll to bottom of page (useful for infinite scroll)"""
@@ -159,3 +229,76 @@ class JavaScriptRenderer:
             
             last_height = new_height
             scrolls += 1
+
+    def click_until_gone(
+            self, selector: str,
+            max_clicks: int = 10,
+            pause_time: float = 1.0,
+            use_js: bool = False,
+            dismiss_overlays: bool = True
+        ):
+        """
+        Repeatedly click an element until it's no longer available
+        Useful for "Load More" buttons that disappear when all content is loaded
+        
+        Args:
+            selector: CSS selector for the element to click
+            max_clicks: Maximum number of times to click
+            pause_time: Time to wait between clicks
+        
+        Returns:
+            Number of successful clicks
+        """
+        if not self.driver:
+            raise RuntimeError("Driver not initialized")
+        
+        clicks = 0
+        
+        for _ in range(max_clicks):
+            try:
+                # Check if element exists and is clickable
+                element = WebDriverWait(self.driver, 2).until(
+                    EC.element_to_be_clickable((By.CSS_SELECTOR, selector))
+                )
+                
+                # Scroll element into view
+                self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", element)
+                time.sleep(0.5)
+                
+                # Click the element
+                element.click()
+                clicks += 1
+                
+                # Wait for content to load
+                time.sleep(pause_time)
+                
+            except (TimeoutException, NoSuchElementException):
+                # Element not found or not clickable anymore - we're done
+                break
+            except Exception as e:
+                print(f"Error clicking element: {e}")
+                break
+        
+        return clicks
+
+    def load_all_content(self, method: str = "scroll", selector: Optional[str] = None, 
+                        max_iterations: int = 10, pause_time: float = 1.0):
+        """
+        Load all content on a page using various methods
+        
+        Args:
+            method: "scroll" for infinite scroll, "click" for load more buttons
+            selector: CSS selector for load more button (required if method="click")
+            max_iterations: Maximum number of scrolls/clicks
+            pause_time: Time to wait between iterations
+        
+        Returns:
+            Number of iterations performed
+        """
+        if method == "scroll":
+            self.scroll_to_bottom(pause_time, max_iterations)
+            return max_iterations
+        elif method == "click" and selector:
+            return self.click_until_gone(selector, max_iterations, pause_time)
+        else:
+            raise ValueError("Invalid method or missing selector for click method")
