@@ -56,6 +56,7 @@ class DataPuller:
     async def scrape_data(self,site:str,payload:dict, api_method:str="extract"):
         url = f"{ws_micro_host}:{ws_micro_port}/{api_method}"
         async with aiohttp.ClientSession() as session:
+            # print(f"url: {url} | payload: {payload}")
             async with session.post(url, json=payload) as response:
                 data = await response.json()
                 return data

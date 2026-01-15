@@ -34,7 +34,7 @@ class JobSearchAgent:
                     - Double check your response. Verify it follows the output JSON format exactly. Verify you are including values for 'criterion' and for 'score'
                     """
         session = aiohttp.ClientSession()
-        client = OllamaClient(session, model="gemma3:1b", system_message=SYSTEM_MESSAGE)
+        client = OllamaClient(session, model="gemma3:12b-it-qat", system_message=SYSTEM_MESSAGE)
         return cls(client)
 
     async def title_review (self, jt, pt, sk):

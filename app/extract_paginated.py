@@ -358,6 +358,77 @@ class paginated:
                 action.get('max_iterations', 10),
                 action.get('pause_time', 1.0)
             )
+        elif action_type == 'wait_for_element':
+            # NEW: Wait for element to appear
+            selector = action.get('selector')
+            timeout = action.get('timeout', 10)
+            if selector:
+                try:
+                    WebDriverWait(renderer.driver, timeout).until(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                except TimeoutException:
+                    print(f"Timeout waiting for element: {selector}")
+        elif action_type == 'wait_for_gone':
+            # NEW: Wait for element to disappear
+            selector = action.get('selector')
+            timeout = action.get('timeout', 10)
+            if selector:
+                try:
+                    WebDriverWait(renderer.driver, timeout).until_not(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                except TimeoutException:
+                    print(f"Timeout waiting for element to disappear: {selector}")
+        elif action_type == 'wait_for_attribute':
+            # NEW: Wait for element attribute to have specific value
+            selector = action.get('selector')
+            attribute = action.get('attribute')
+            value = action.get('value')
+            timeout = action.get('timeout', 10)
+            
+            if selector and attribute:
+                try:
+                    if value is not None:
+                        # Wait for attribute to equal specific value
+                        WebDriverWait(renderer.driver, timeout).until(
+                            lambda d: d.find_element(By.CSS_SELECTOR, selector).get_attribute(attribute) == str(value)
+                        )
+                    else:
+                        # Wait for attribute to exist (any value)
+                        WebDriverWait(renderer.driver, timeout).until(
+                            lambda d: d.find_element(By.CSS_SELECTOR, selector).get_attribute(attribute) is not None
+                        )
+                    print(f"Element {selector} attribute {attribute} = {value}")
+                except TimeoutException:
+                    print(f"Timeout waiting for {selector} attribute {attribute} to be {value}")
+                except Exception as e:
+                    print(f"Error waiting for attribute: {e}")
+        elif action_type == 'wait_for_class':
+            # NEW: Wait for element to have/not have specific class
+            selector = action.get('selector')
+            class_name = action.get('class_name')
+            should_have = action.get('should_have', True)
+            timeout = action.get('timeout', 10)
+            
+            if selector and class_name:
+                try:
+                    if should_have:
+                        # Wait for class to be added
+                        WebDriverWait(renderer.driver, timeout).until(
+                            lambda d: class_name in (d.find_element(By.CSS_SELECTOR, selector).get_attribute('class') or '')
+                        )
+                        print(f"Element {selector} has class {class_name}")
+                    else:
+                        # Wait for class to be removed
+                        WebDriverWait(renderer.driver, timeout).until(
+                            lambda d: class_name not in (d.find_element(By.CSS_SELECTOR, selector).get_attribute('class') or '')
+                        )
+                        print(f"Element {selector} no longer has class {class_name}")
+                except TimeoutException:
+                    print(f"Timeout waiting for class {class_name} on {selector}")
+                except Exception as e:
+                    print(f"Error waiting for class: {e}")
         elif action_type == 'script':
             script = action.get('code')
             if script:

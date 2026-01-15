@@ -93,9 +93,6 @@ class JavaScriptRenderer:
     
     def _wait_for_content(self, wait_config: Dict):
         """Wait for content based on configuration"""
-        if not self.driver:
-            raise RuntimeError("Driver not initialized")
-        
         wait_type = wait_config.get('type', 'time')
         timeout = wait_config.get('timeout', self.wait_time)
         
@@ -114,6 +111,17 @@ class JavaScriptRenderer:
                     )
                 except TimeoutException:
                     print(f"Timeout waiting for element: {selector}")
+        
+        elif wait_type == 'element_gone':
+            # NEW: Wait for element to disappear
+            selector = wait_config.get('value')
+            if selector:
+                try:
+                    WebDriverWait(self.driver, timeout).until_not(
+                        EC.presence_of_element_located((By.CSS_SELECTOR, selector))
+                    )
+                except TimeoutException:
+                    print(f"Timeout waiting for element to disappear: {selector}")
         
         elif wait_type == 'script':
             # Wait for custom JavaScript condition

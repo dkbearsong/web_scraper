@@ -258,8 +258,22 @@ async def main():
         if job_description.get('pay') is None:
             from app.call_Ollama import OllamaClient
             session = aiohttp.ClientSession()
-            sys_message = "You will be provided with a job description. Your task is to extract the pay range mentioned in the description. If a pay range is found, return it in the format 'X - Y' where X is the minimum pay and Y is the maximum pay. If multiple pay ranges are mentioned, return a new range with the smallest pay to the largest pay. If no pay range is mentioned, respond with 'Not specified'. Ensure that your response is concise and only contains the pay range or 'Not specified'."
-            client = OllamaClient(session=session, model="hf.co/bartowski/microsoft_Fara-7B-GGUF:latest", system_message=sys_message)
+            sys_message = """
+            You will be provided with a job description. Your task is to extract the pay range mentioned in the description. If a pay range is found, return it in the 
+            format 'X - Y' where X is the minimum pay and Y is the maximum pay. If multiple pay ranges are mentioned, return a new, single range with the smallest pay 
+            to the largest pay. Ex:
+            Input:
+            Zone A: $135k-$174k
+            Zone B: $121k-$163k
+            Zone C: $115k-$152k
+            Germany: €98k-€141k
+
+            Output:
+            $115k-$174k
+            
+            If no pay range is mentioned, respond with 'Not specified'. Only return pay ranges in USD as shown in the job description. Ensure 
+            that your response is concise and only contains the pay range or 'Not specified'."""
+            client = OllamaClient(session=session, model="hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M", system_message=sys_message)
             # print(f"sum data sum: {summary['data']['summary']}")
             pay_range = await get_pay_range(client, summary['data'][0]['summary'])
             print(f"AI response for pay: {pay_range}")
