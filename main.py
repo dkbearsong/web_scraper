@@ -69,7 +69,7 @@ def crawl():
         data = request.get_json()
         
         if not data or 'url' not in data:
-            return jsonify({'error': 'URL is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         # Create configuration
         config_data = data.get('config', {})
@@ -96,13 +96,14 @@ def crawl():
         results = crawler.crawl()
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'pages_crawled': len(results),
             'results': [asdict(r) for r in results]
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/strategies', methods=['GET'])
 def list_strategies():
@@ -145,7 +146,7 @@ def analyze_page():
         data = request.get_json()
         
         if not data or 'url' not in data:
-            return jsonify({'error': 'URL is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         url = data['url']
         
@@ -161,13 +162,14 @@ def analyze_page():
         analysis = analyzer.analyze()
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'url': url,
             'analysis': analysis
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract', methods=['POST'])
 def quick_extract():
@@ -185,7 +187,7 @@ def quick_extract():
         data = request.get_json()
         
         if not data or 'url' not in data:
-            return jsonify({'error': 'URL is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         config = CrawlConfig(
             url=data['url'],
@@ -227,15 +229,15 @@ def quick_extract():
                     else:
                         extracted_data = []
             return jsonify({
+                'status_code': results[0].status_code,
                 'success': True,
-                'data': extracted_data,
-                'status_code': results[0].status_code
+                'data': extracted_data
             })
         else:
-            return jsonify({'error': 'No data extracted'}), 500
+            return jsonify({'status_code': 500, 'error': 'No data extracted'}), 500
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract-js', methods=['POST'])
 def extract_js():
@@ -269,7 +271,7 @@ def extract_js():
         data = request.get_json()
         
         if not data or 'url' not in data:
-            return jsonify({'error': 'URL is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         url = data['url']
         js_config = data.get('js_config', {})
@@ -366,15 +368,15 @@ def extract_js():
                     extracted_data = []
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'url': url,
             'rendered': True,
-            'data': extracted_data,
-            'status_code': 200
+            'data': extracted_data
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/crawl-js', methods=['POST'])
 def crawl_js():
@@ -402,7 +404,7 @@ def crawl_js():
         data = request.get_json()
         
         if not data or 'url' not in data:
-            return jsonify({'error': 'URL is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         # Create configuration
         config_data = data.get('config', {})
@@ -430,13 +432,14 @@ def crawl_js():
         results = crawler.crawl()
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'pages_crawled': len(results),
             'results': [asdict(r) for r in results]
         })
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract-paginated', methods=['POST'])
 def extract_paginated():
@@ -473,7 +476,7 @@ def extract_paginated():
         data = request.get_json()
         
         if not data:
-            return jsonify({'error': 'Request body is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'Request body is required'}), 400
         
         # Determine pagination method
         if 'url_template' in data:
@@ -483,10 +486,10 @@ def extract_paginated():
             # Click-based pagination
             return pag_obj._extract_click_pagination(data)
         else:
-            return jsonify({'error': 'Either url_template or pagination config is required'}), 400
+            return jsonify({'status_code': 400, 'error': 'Either url_template or pagination config is required'}), 400
             
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'status_code': 500, 'error': str(e)}), 500
     
 
 if __name__ == '__main__':

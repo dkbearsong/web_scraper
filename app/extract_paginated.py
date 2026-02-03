@@ -75,31 +75,34 @@ class paginated:
             session = requests.Session()
             session.headers.update({'User-Agent': 'CustomCrawler/1.0'})
             
-            for page_num in range(start_page, end_page + 1):
-                try:
-                    url = url_template.format(page=page_num)
-                    
-                    response = session.get(url, timeout=10)
-                    soup = BeautifulSoup(response.content, 'html.parser')
-                    
-                    # Extract data
-                    page_data = strategy.extract(soup, url)
-                    
-                    all_results.append({
-                        'page': page_num,
-                        'url': url,
-                        'status_code': response.status_code,
-                        'data': page_data
-                    })
-                    
-                    time.sleep(delay)
-                    
-                except Exception as e:
-                    all_results.append({
-                        'page': page_num,
-                        'url': url,
-                        'error': str(e)
-                    })
+            try:
+                for page_num in range(start_page, end_page + 1):
+                    try:
+                        url = url_template.format(page=page_num)
+                        
+                        response = session.get(url, timeout=10)
+                        soup = BeautifulSoup(response.content, 'html.parser')
+                        
+                        # Extract data
+                        page_data = strategy.extract(soup, url)
+                        
+                        all_results.append({
+                            'page': page_num,
+                            'url': url,
+                            'status_code': response.status_code,
+                            'data': page_data
+                        })
+                        
+                        time.sleep(delay)
+                        
+                    except Exception as e:
+                        all_results.append({
+                            'page': page_num,
+                            'url': url,
+                            'error': str(e)
+                        })
+            finally:
+                session.close()  # Properly close the session
         
         # Aggregate data from all pages
         aggregated_data = []
@@ -128,6 +131,7 @@ class paginated:
                 aggregated_data.extend(page_list)
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'data': aggregated_data,
             'total_pages': len(all_results)
@@ -148,11 +152,30 @@ class paginated:
         wait_config = js_config.get('wait')
         initial_actions = js_config.get('actions', [])
         
+        # Extract job/item selector from config for content change detection
+        selectors_config = data.get('selectors', {})
+        job_selector = None
+        # Try to find the main item selector (usually the first key in selectors)
+        if selectors_config:
+            # Look for common keys like 'jobs', 'items', 'results', etc.
+            for key in ['jobs', 'items', 'results', 'listings', 'products']:
+                if key in selectors_config:
+                    job_config = selectors_config[key]
+                    if isinstance(job_config, dict) and 'selector' in job_config:
+                        job_selector = job_config['selector']
+                        break
+            # If not found, use the first selector's selector
+            if not job_selector and selectors_config:
+                first_key = list(selectors_config.keys())[0]
+                first_config = selectors_config[first_key]
+                if isinstance(first_config, dict) and 'selector' in first_config:
+                    job_selector = first_config['selector']
+        
         # Create strategy
         strategy_type = data.get('strategy', 'generic')
         strategy = StrategyFactory.create(
             strategy_type,
-            selectors=data.get('selectors', {})
+            selectors=selectors_config
         )
         
         all_results = []
@@ -171,15 +194,29 @@ class paginated:
                     # Wait a bit for page to stabilize
                     time.sleep(1)
 
-                    # Get a unique identifier from the current page (like first job title)
+                    # Get a unique identifier from the current page using the actual job selector
                     # This helps us detect when content actually changes
-
-                    # NEW - Checks actual job containers
-                    old_content_marker = renderer.driver.execute_script(
-                        "const containers = document.querySelectorAll('div.position-container'); "
-                        "return containers.length > 0 ? Array.from(containers).map(c => c.textContent.trim().substring(0, 50)).join('|') : document.body.innerText.substring(0, 200);"
-                    )
-
+                    old_content_marker = None
+                    try:
+                        if job_selector:
+                            # Use the actual job selector from config
+                            escaped_selector = job_selector.replace("'", "\\'")
+                            old_content_marker = renderer.driver.execute_script(
+                                f"const containers = document.querySelectorAll('{escaped_selector}'); "
+                                "if (containers.length > 0) { "
+                                "  return Array.from(containers).slice(0, 3).map(c => c.textContent.trim().substring(0, 100)).join('|'); "
+                                "} "
+                                "return document.body.innerText.substring(0, 300);"
+                            )
+                        else:
+                            # Fallback to body text
+                            old_content_marker = renderer.driver.execute_script(
+                                "return document.body.innerText.substring(0, 300);"
+                            )
+                    except Exception as e:
+                        print(f"Warning: Could not get content marker: {e}")
+                        old_content_marker = renderer.driver.execute_script("return document.body.innerText.substring(0, 300);")
+                    
                     # Get current page HTML
                     html = renderer.driver.page_source
                     soup = BeautifulSoup(html, 'html.parser')
@@ -187,13 +224,24 @@ class paginated:
                     # Extract data
                     page_data = strategy.extract(soup, renderer.driver.current_url)
                     
+                    # Count items extracted for logging
+                    item_count = 0
+                    if isinstance(page_data, dict):
+                        # For table extraction, count items in the first list value
+                        for key, value in page_data.items():
+                            if isinstance(value, list):
+                                item_count = len(value)
+                                break
+                    elif isinstance(page_data, list):
+                        item_count = len(page_data)
+                    
                     all_results.append({
                         'page': page_num,
                         'url': renderer.driver.current_url,
                         'data': page_data
                     })
                 
-                    print(f"Extracted page {page_num}, found data: {len(str(page_data))} characters")
+                    print(f"Extracted page {page_num}, found {item_count} items")
                 
                     # Try to click next button
                     if page_num < max_pages:
@@ -219,7 +267,8 @@ class paginated:
                             is_disabled = (element.get_attribute('disabled') or 
                                         'is-disabled' in element_class or 
                                         'disabled' in element_class or
-                                        'is-disabled' in parent_class)
+                                        'is-disabled' in parent_class or
+                                        element.get_attribute('aria-disabled') == 'true')
                             if is_disabled:
                                 print(f"Next button is disabled on page {page_num}, stopping")
                                 break
@@ -254,17 +303,37 @@ class paginated:
                             # Initial wait for navigation
                             time.sleep(wait_after_click)
                             
+                            # Wait for job listings to appear if we have a job selector
+                            if job_selector:
+                                try:
+                                    WebDriverWait(renderer.driver, 10).until(
+                                        EC.presence_of_element_located((By.CSS_SELECTOR, job_selector))
+                                    )
+                                    print(f"Job listings appeared after click")
+                                except TimeoutException:
+                                    print(f"Warning: Job listings did not appear within timeout, continuing anyway")
+                            
                             # Verify content actually changed
                             content_changed = False
-                            max_retries = 10  # Increased retries
+                            max_retries = 15  # Increased retries for slower loading
                             for retry in range(max_retries):
                                 try:
-                                    new_content_marker = renderer.driver.execute_script(
-                                        "const containers = document.querySelectorAll('div.position-container'); "
-                                        "return containers.length > 0 ? Array.from(containers).map(c => c.textContent.trim().substring(0, 50)).join('|') : document.body.innerText.substring(0, 200);"
-                                    )
+                                    if job_selector:
+                                        # Use the actual job selector from config
+                                        escaped_selector = job_selector.replace("'", "\\'")
+                                        new_content_marker = renderer.driver.execute_script(
+                                            f"const containers = document.querySelectorAll('{escaped_selector}'); "
+                                            "if (containers.length > 0) { "
+                                            "  return Array.from(containers).slice(0, 3).map(c => c.textContent.trim().substring(0, 100)).join('|'); "
+                                            "} "
+                                            "return document.body.innerText.substring(0, 300);"
+                                        )
+                                    else:
+                                        new_content_marker = renderer.driver.execute_script(
+                                            "return document.body.innerText.substring(0, 300);"
+                                        )
                                     
-                                    if new_content_marker != old_content_marker:
+                                    if new_content_marker != old_content_marker and new_content_marker:
                                         # Content changed, we're on a new page
                                         print(f"Content changed after {retry + 1} checks, moving to page {page_num + 1}")
                                         content_changed = True
@@ -272,11 +341,14 @@ class paginated:
                                     else:
                                         # Content hasn't changed yet, wait a bit more
                                         time.sleep(0.5)
-                                except:
+                                except Exception as e:
+                                    print(f"Error checking content change (retry {retry + 1}): {e}")
                                     time.sleep(0.5)
                             
                             if not content_changed:
                                 print(f"Warning: Content didn't change after clicking next on page {page_num}, stopping")
+                                print(f"Old marker: {old_content_marker[:100] if old_content_marker else 'None'}...")
+                                print(f"New marker: {new_content_marker[:100] if 'new_content_marker' in locals() and new_content_marker else 'None'}...")
                                 break
                             
                         except (TimeoutException, NoSuchElementException) as e:
@@ -285,14 +357,23 @@ class paginated:
                             break
                         except Exception as e:
                             print(f"Error clicking next button on page {page_num}: {e}")
+                            import traceback
+                            traceback.print_exc()
                             break
                             
                 except Exception as e:
+                    print(f"Error on page {page_num}: {e}")
+                    import traceback
+                    traceback.print_exc()
                     all_results.append({
                         'page': page_num,
                         'error': str(e)
                     })
-                    break
+                    # Don't break on extraction errors, continue to next page
+                    if page_num < max_pages:
+                        continue
+                    else:
+                        break
         
         # Aggregate data from all pages
         aggregated_data = []
@@ -321,6 +402,7 @@ class paginated:
                 aggregated_data.extend(page_list)
         
         return jsonify({
+            'status_code': 200,
             'success': True,
             'data': aggregated_data,
             'total_pages': len(all_results)

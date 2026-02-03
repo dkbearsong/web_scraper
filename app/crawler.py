@@ -24,7 +24,7 @@ class WebCrawler:
         self.visited = set()
         self.results = []
         self.session = requests.Session()
-        self.scraper = cloudscraper.create_scraper()
+        self.scraper = cloudscraper.create_scraper()  # Create once, reuse throughout
 
         headers = {
             'User-Agent': config.user_agent
@@ -52,9 +52,8 @@ class WebCrawler:
             time.sleep(self.config.delay)
             response = self.session.get(url, timeout=self.config.timeout)
             if response.status_code == 403:
-                # Handle Cloudflare protection
-                scraper = cloudscraper.create_scraper()
-                response = scraper.get(url, timeout=self.config.timeout)
+                # Handle Cloudflare protection - reuse stored scraper
+                response = self.scraper.get(url, timeout=self.config.timeout)
 
             soup = BeautifulSoup(response.content, 'html.parser')
             data = self.strategy.extract(soup, url)
@@ -70,12 +69,6 @@ class WebCrawler:
                 links=links
             )
             self.results.append(result)
-            
-            # Follow links if configured
-            if self.config.follow_links:
-                for link in links[:5]:  # Limit links per page
-                    if len(self.results) < self.config.max_pages:
-                        self._crawl_recursive(link, depth + 1)
             
             # Follow links if configured
             if self.config.follow_links:
@@ -114,6 +107,31 @@ class JSWebCrawler(WebCrawler):
     def __init__(self, config: CrawlConfig, strategy: ExtractionStrategy, js_config: Dict):
         super().__init__(config, strategy)
         self.js_config = js_config
+        self.renderer = None  # Reuse renderer across pages
+    
+    def _get_renderer(self):
+        """Get or create a reusable renderer"""
+        if self.renderer is None:
+            headless = self.js_config.get('headless', True)
+            self.renderer = JavaScriptRenderer(headless=headless)
+            self.renderer.__enter__()
+        return self.renderer
+    
+    def _cleanup_renderer(self):
+        """Cleanup renderer when done"""
+        if self.renderer is not None:
+            try:
+                self.renderer.__exit__(None, None, None)
+            finally:
+                self.renderer = None
+    
+    def crawl(self) -> List[CrawlResult]:
+        """Start crawling from the initial URL"""
+        try:
+            self._crawl_recursive(self.config.url, 0)
+        finally:
+            self._cleanup_renderer()
+        return self.results
     
     def _crawl_recursive(self, url: str, depth: int):
         """Recursively crawl pages with JS rendering"""
@@ -128,45 +146,44 @@ class JSWebCrawler(WebCrawler):
         try:
             time.sleep(self.config.delay)
             
-            # Render page with Selenium
-            headless = self.js_config.get('headless', True)
+            # Reuse renderer for all pages
+            renderer = self._get_renderer()
             wait_config = self.js_config.get('wait')
             actions = self.js_config.get('actions', [])
             
-            with JavaScriptRenderer(headless=headless) as renderer:
-                # Load and render page
-                html = renderer.render_page(url, wait_config)
+            # Load and render page
+            html = renderer.render_page(url, wait_config)
+            
+            # Perform actions
+            for action in actions:
+                action_type = action.get('type')
                 
-                # Perform actions
-                for action in actions:
-                    action_type = action.get('type')
-                    
-                    if action_type == 'click':
-                        renderer.click_element(action.get('selector'))
-                    elif action_type == 'scroll':
-                        renderer.scroll_to_bottom(
-                            action.get('pause_time', 1.0),
-                            action.get('max_scrolls', 10)
-                        )
-                    elif action_type == 'click_until_gone':
-                        selector = action.get('selector')
-                        max_clicks = action.get('max_clicks', 10)
-                        pause_time = action.get('pause_time', 1.0)
-                        if selector:
-                            renderer.click_until_gone(selector, max_clicks, pause_time)
-                    elif action_type == 'load_all':
-                        method = action.get('method', 'scroll')
-                        selector = action.get('selector')
-                        max_iterations = action.get('max_iterations', 10)
-                        pause_time = action.get('pause_time', 1.0)
-                        renderer.load_all_content(method, selector, max_iterations, pause_time)
-                    elif action_type == 'script':
-                        renderer.execute_script(action.get('code'))
-                    elif action_type == 'wait':
-                        time.sleep(action.get('seconds', 1))
-                
-                # Get final HTML
-                html = renderer.driver.page_source
+                if action_type == 'click':
+                    renderer.click_element(action.get('selector'))
+                elif action_type == 'scroll':
+                    renderer.scroll_to_bottom(
+                        action.get('pause_time', 1.0),
+                        action.get('max_scrolls', 10)
+                    )
+                elif action_type == 'click_until_gone':
+                    selector = action.get('selector')
+                    max_clicks = action.get('max_clicks', 10)
+                    pause_time = action.get('pause_time', 1.0)
+                    if selector:
+                        renderer.click_until_gone(selector, max_clicks, pause_time)
+                elif action_type == 'load_all':
+                    method = action.get('method', 'scroll')
+                    selector = action.get('selector')
+                    max_iterations = action.get('max_iterations', 10)
+                    pause_time = action.get('pause_time', 1.0)
+                    renderer.load_all_content(method, selector, max_iterations, pause_time)
+                elif action_type == 'script':
+                    renderer.execute_script(action.get('code'))
+                elif action_type == 'wait':
+                    time.sleep(action.get('seconds', 1))
+            
+            # Get final HTML
+            html = renderer.driver.page_source
             
             # Parse and extract
             soup = BeautifulSoup(html, 'html.parser')
@@ -188,8 +205,7 @@ class JSWebCrawler(WebCrawler):
             if self.config.follow_links:
                 for link in links[:5]:
                     if len(self.results) < self.config.max_pages:
-                        self._crawl_recursive(link, depth + 1)
-            
+                        self._crawl_recursive(link, depth + 1)         
         except Exception as e:
             result = CrawlResult(
                 url=url,

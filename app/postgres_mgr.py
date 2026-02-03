@@ -243,7 +243,7 @@ class PostgresManager:
             base = sql.SQL("{} LIMIT {}").format(base, sql.Literal(limit))
 
         conn = self._get_conn(dbname)
-        print(f"base: {base} | params: {params}")
+        # print(f"base: {base} | params: {params}")
         with conn.cursor() as cur:
             cur.execute(base, params)
             rows = cur.fetchall()

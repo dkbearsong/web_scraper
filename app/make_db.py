@@ -46,7 +46,9 @@ def make_db():
                 "notes": "TEXT",
                 "my_title_score": "INT",
                 "my_summary_score": "INT",
-                "skip": "BOOLEAN"
+                "skip": "BOOLEAN",
+                "flexibility":"VARCHAR(100)",
+                "source":"VARCHAR(255)"
             },
             {
                 "id": "INT PRIMARY KEY GENERATED ALWAYS AS IDENTITY",

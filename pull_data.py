@@ -46,19 +46,20 @@ class DataPuller:
     # Pull request payload from .site_strategies/{site}.json
 
     def load_site_strategies(self, path: str) -> list:
-        print(path)
+        # print(path)
         with open(path, 'r') as f:
             site_strategies = json.load(f)
         return site_strategies
 
     # Load pulled data into database
 
-    async def scrape_data(self,site:str,payload:dict, api_method:str="extract"):
+    async def scrape_data(self, payload:dict, api_method:str="extract"):
         url = f"{ws_micro_host}:{ws_micro_port}/{api_method}"
         async with aiohttp.ClientSession() as session:
             # print(f"url: {url} | payload: {payload}")
             async with session.post(url, json=payload) as response:
                 data = await response.json()
+                # print(f"Data: {data}")
                 return data
 
     def load_scraped_data_to_db(self, data: list):
@@ -83,7 +84,7 @@ class DataPuller:
                 company_id = companies[0][0]
             else:
                 result = self.conn.insert("company", {"company_name": item['company'], "company_url": item['company_url']}, returning=["id"])
-                print(f"result: {result[0][0]}")
+                # print(f"result: {result[0][0]}")
                 company_id = result[0][0]
 
             # Get or insert office
@@ -104,15 +105,20 @@ class DataPuller:
             """
             rows = self.conn.execute_sql(query, (item['title'], company_id, office_id), fetch=True)
             if rows:
+                print(f"Rows found: {rows}")
                 continue  # Skip duplicate
             
+            # print(f"item source: {item['source']}")
+
             # Insert job
             insert_data = {
-                "job_name": item['title'], 
-                "company_id": company_id, 
-                "office_id": office_id, 
+                "job_name": item['title'],
+                "company_id": company_id,
+                "office_id": office_id,
                 "link": item['url'],
-                "date_added": date.today()
+                "date_added": date.today(),
+                "flexibility": item['flexibility'],
+                "source":item['source']
             }
 
             if 'pay' in item:
@@ -131,6 +137,7 @@ class DataPuller:
         returns: list of dicts
         '''
         rows = self.conn.execute_sql(query, fetch=True)
+        # print(rows)
         return rows
 
     def insert_data_db(self, query: str, params: tuple = ()):
@@ -146,3 +153,27 @@ class DataPuller:
         self.conn.close()
         return
     
+def main():
+    import os
+    from dotenv import load_dotenv
+    
+    load_dotenv()
+    dp = DataPuller(
+        dbname = os.getenv("DB_NAME", ""),
+        user = os.getenv("DB_USER", ""),
+        password = os.getenv("DB_PASSWORD", ""),
+        host = os.getenv("DB_HOST", "localhost"),
+        port = os.getenv("DB_PORT", "5432")
+    )
+    query = f'''
+        SELECT DISTINCT c.company_name AS company, c.company_url, j.source
+        FROM company c
+        JOIN job j ON j.company_id = c.id
+        WHERE title_rating >= 80 AND skip IS NOT True AND job_summary IS NULL;
+    '''
+    data = dp.pull_data_db(query)
+    data2 = dict(data)
+    print(f"Data: {data2}")
+
+if __name__ == "__main__":
+    main()
