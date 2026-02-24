@@ -1,5 +1,7 @@
 import aiohttp
 import json
+import asyncio
+import os
 import csv
 import time
 from random import random
@@ -55,12 +57,46 @@ class DataPuller:
 
     async def scrape_data(self, payload:dict, api_method:str="extract"):
         url = f"{ws_micro_host}:{ws_micro_port}/{api_method}"
-        async with aiohttp.ClientSession() as session:
-            # print(f"url: {url} | payload: {payload}")
-            async with session.post(url, json=payload) as response:
-                data = await response.json()
-                # print(f"Data: {data}")
-                return data
+        # Allow overriding the microservice request timeout via env var
+        try:
+            timeout_seconds = int(os.getenv("MICROSERVICE_TIMEOUT", "120"))
+        except (TypeError, ValueError):
+            timeout_seconds = 120
+        timeout = aiohttp.ClientTimeout(total=timeout_seconds)
+        try:
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                # print(f"url: {url} | payload: {payload}")
+                async with session.post(url, json=payload) as response:
+                    status = response.status
+                    try:
+                        resp_json = await response.json()
+                    except Exception:
+                        # fallback to text if JSON parsing fails
+                        text = await response.text()
+                        resp_json = {"raw": text}
+
+                    # If the microservice already returns a dict with status_code, keep it,
+                    # otherwise inject the HTTP status under 'status_code' and ensure 'data' exists.
+                    if isinstance(resp_json, dict):
+                        resp_json.setdefault('status_code', status)
+                        if 'data' not in resp_json:
+                            # If the body itself is the data (e.g., a list), wrap it
+                            # but only if it's not empty dict
+                            if resp_json and not any(k in resp_json for k in ('data', 'error', 'status_code')):
+                                resp_json = {'data': resp_json, 'status_code': status}
+                    else:
+                        resp_json = {'data': resp_json, 'status_code': status}
+
+                    return resp_json
+        except asyncio.CancelledError:
+            # propagate cancellation
+            raise
+        except asyncio.TimeoutError as e:
+            return {'status_code': 408, 'data': [], 'error': 'Request timed out', 'exception': str(e)}
+        except aiohttp.ClientError as e:
+            return {'status_code': 503, 'data': [], 'error': 'Client error', 'exception': str(e)}
+        except Exception as e:
+            return {'status_code': 500, 'data': [], 'error': 'Unexpected error', 'exception': str(e)}
 
     def load_scraped_data_to_db(self, data: list):
         '''

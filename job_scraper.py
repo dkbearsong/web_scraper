@@ -5,6 +5,7 @@ import aiohttp
 import json
 from docx import Document
 import asyncio
+import re
 
 # Modules
 from pull_data import DataPuller
@@ -47,6 +48,8 @@ def scrape_single_job_board(new_data, company_url, company=""):
             "source":new_data['source'] if new_data.get('source') else ""
             }
         if item.get('location') is not None:
+            if re.search(r"location", item['location'], re.IGNORECASE):
+                item['location'] = re.sub(r'location', "", item['location'], flags=re.IGNORECASE)
             maker["location"] = item['location']
         company_list.append(maker)
     # print(f"Company List: {company_list}")
@@ -73,11 +76,15 @@ async def scrape_sites(i, company_url, dp):
     # print(f"Payload: {i}")
     new_data = await dp.scrape_data(i['strategy'], api_method=i['api_method'])
     new_data['source'] = i['strategy']['source']
-    print(f"New Data source: {new_data['source']}")
+    # print(f"New Data source: {new_data['source']}. New Data: {str(new_data)}...")
     # if new_data['data'].get(0) is None:
     #     print(f"New Data: {new_data}")
     if new_data['status_code'] != 200:
         print(f"Scraping data failed. Error code {new_data['status_code']}. Error: {new_data['error'] if new_data.get('error') is not None else 'No error message provided.'}")
+        return
+    if 'data' not in new_data:
+        print(f"Warning: No 'data' key in response from {i['company']}. Response: {new_data}")
+        return
     if len(new_data['data']) != 0:
         try:
             
@@ -165,6 +172,77 @@ async def get_pay_range(client, js):
     print(f"Raw response for pay range extraction: {response['pay_range']}")
     return response['pay_range']
 
+async def fix_payrange_main():
+    scrape_summaries = f'''
+        SELECT j.id,j.link, c.company_name AS company, j.source AS source, j.job_summary AS summary, j.pay_range as pay_range
+        FROM job j
+        JOIN company c ON j.company_id = c.id
+        WHERE j.title_rating >= 80 AND j.skip IS NOT True AND j.pay_range IS NULL;
+    '''
+    # Load .env variables
+    # prev_titles = json.loads(os.getenv("PREV_TITLES", "[]"))
+    # skills = json.loads(os.getenv("SKILLS", "[]"))
+
+    # Create Data Puller Object
+    dp = DataPuller(
+        dbname = os.getenv("DB_NAME", ""),
+        user = os.getenv("DB_USER", ""),
+        password = os.getenv("DB_PASSWORD", ""),
+        host = os.getenv("DB_HOST", "localhost"),
+        port = os.getenv("DB_PORT", "5432")
+    )
+    pull_ss_list = dp.pull_data_db(scrape_summaries) # pull in the jobs that need summaries scraped
+    scrape_sum_list = [dict(row) for row in pull_ss_list]  #presuming data in list
+
+    data = []
+
+    for i in scrape_sum_list:
+        job_description = {
+            'id': i['id'],
+            'summary': i['summary'],
+            'pay': i['pay_range'] if i.get('pay_range') is not None else None
+        }
+        if job_description.get('pay') is None:
+            session = aiohttp.ClientSession()
+            sys_message = """
+            You will be provided with a job description. Your task is to extract the pay range mentioned in the description. If a pay range is found, return it in the 
+            format 'X - Y' where X is the minimum pay and Y is the maximum pay. If multiple pay ranges are mentioned, return a new, single range with the smallest pay 
+            to the largest pay. Ex:
+            Input:
+            Zone A: $135k-$174k
+            Zone B: $121k-$163k
+            Zone C: $115k-$152k
+            Germany: €98k-€141k
+
+            Output:
+            $115k-$174k
+
+            If no pay range is mentioned, respond with 'Not specified'. Only return pay ranges in USD as shown in the job description. Ensure 
+            that your response is concise and only contains the pay range or 'Not specified'."""
+            client = OllamaClient(session=session, model="hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M", system_message=sys_message)
+            job_description['pay'] = await get_job_payrate(client, i['summary'])
+            await client.unload()
+            await client.session.close()
+
+        data.append(job_description)
+    print(f"Total Summaries scraped: {len(data)}")
+
+    # Update the scraped summaries in the DB
+    for i in data:
+        summary = i['summary']
+        id = i['id']
+        if i.get('pay') != 'Not specified' and (i.get('pay') is not None or i.get('pay') != None):
+            pay = i['pay']
+            query = f'''
+            UPDATE job
+            SET pay_range = %s
+            WHERE id = %s
+            '''
+        else:
+            continue
+        dp.insert_data_db(query, (pay, id))
+    dp.commit_data_db()
+
 #==================== Job Scraper =========================
 
 async def main():
@@ -220,15 +298,23 @@ async def main():
         print(f"Scraping {i['company']}")
         if isinstance(i['strategy']['url'],str):
             d = await scrape_sites(i, company_url, dp)
-            data += d
+            if not d:
+                continue
+            if isinstance(d, list):
+                data += d
+            else:
+                data.append(d)
         elif isinstance(i['strategy']['url'],list):
             for j in i['strategy']['url']:
                 new_payload = i
                 new_payload['strategy']['url'] = j
                 d = await scrape_sites(new_payload, company_url, dp)
-                if d is None:
+                if not d:
                     continue
-                data += d 
+                if isinstance(d, list):
+                    data += d
+                else:
+                    data.append(d)
     print(f"Total jobs scraped: {len(data)}")
     # print(f"Data: {data}")
     # sys.exit("Stopping program")
@@ -361,7 +447,8 @@ async def main():
             SET job_summary = %s
             WHERE id = %s
             '''
-        print(f"Updating job id {id} with summary {summary[:30]}...")
+        summary_preview = summary[:30] if summary and isinstance(summary, str) else str(summary)[:30] if summary else "None"
+        print(f"Updating job id {id} with summary {summary_preview}...")
         # print(f"query: {query}")
         dp.insert_data_db(query, (summary, pay, id) if i.get('pay') != 'Not specified' and (i.get('pay') is not None or i.get('pay') != None) else (summary, id))
     dp.commit_data_db()
@@ -424,77 +511,6 @@ async def main():
     print(f"all done updating city/state/country")
 
     return
-
-async def fix_payrange_main():
-    scrape_summaries = f'''
-        SELECT j.id,j.link, c.company_name AS company, j.source AS source, j.job_summary AS summary, j.pay_range as pay_range
-        FROM job j
-        JOIN company c ON j.company_id = c.id
-        WHERE j.title_rating >= 80 AND j.skip IS NOT True AND j.pay_range IS NULL;
-    '''
-    # Load .env variables
-    # prev_titles = json.loads(os.getenv("PREV_TITLES", "[]"))
-    # skills = json.loads(os.getenv("SKILLS", "[]"))
-
-    # Create Data Puller Object
-    dp = DataPuller(
-        dbname = os.getenv("DB_NAME", ""),
-        user = os.getenv("DB_USER", ""),
-        password = os.getenv("DB_PASSWORD", ""),
-        host = os.getenv("DB_HOST", "localhost"),
-        port = os.getenv("DB_PORT", "5432")
-    )
-    pull_ss_list = dp.pull_data_db(scrape_summaries) # pull in the jobs that need summaries scraped
-    scrape_sum_list = [dict(row) for row in pull_ss_list]  #presuming data in list
-
-    data = []
-
-    for i in scrape_sum_list:
-        job_description = {
-            'id': i['id'],
-            'summary': i['summary'],
-            'pay': i['pay_range'] if i.get('pay_range') is not None else None
-        }
-        if job_description.get('pay') is None:
-            session = aiohttp.ClientSession()
-            sys_message = """
-            You will be provided with a job description. Your task is to extract the pay range mentioned in the description. If a pay range is found, return it in the 
-            format 'X - Y' where X is the minimum pay and Y is the maximum pay. If multiple pay ranges are mentioned, return a new, single range with the smallest pay 
-            to the largest pay. Ex:
-            Input:
-            Zone A: $135k-$174k
-            Zone B: $121k-$163k
-            Zone C: $115k-$152k
-            Germany: €98k-€141k
-
-            Output:
-            $115k-$174k
-
-            If no pay range is mentioned, respond with 'Not specified'. Only return pay ranges in USD as shown in the job description. Ensure 
-            that your response is concise and only contains the pay range or 'Not specified'."""
-            client = OllamaClient(session=session, model="hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M", system_message=sys_message)
-            job_description['pay'] = await get_job_payrate(client, i['summary'])
-            await client.unload()
-            await client.session.close()
-
-        data.append(job_description)
-    print(f"Total Summaries scraped: {len(data)}")
-
-    # Update the scraped summaries in the DB
-    for i in data:
-        summary = i['summary']
-        id = i['id']
-        if i.get('pay') != 'Not specified' and (i.get('pay') is not None or i.get('pay') != None):
-            pay = i['pay']
-            query = f'''
-            UPDATE job
-            SET pay_range = %s
-            WHERE id = %s
-            '''
-        else:
-            continue
-        dp.insert_data_db(query, (pay, id))
-    dp.commit_data_db()
 
 if __name__ == "__main__":
     asyncio.run(main())

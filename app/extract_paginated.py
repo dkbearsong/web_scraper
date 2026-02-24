@@ -155,8 +155,12 @@ class paginated:
         # Extract job/item selector from config for content change detection
         selectors_config = data.get('selectors', {})
         job_selector = None
+        
+        # First, check if content_change_selector is explicitly specified in pagination config
+        if 'content_change_selector' in pagination_config:
+            job_selector = pagination_config['content_change_selector']
         # Try to find the main item selector (usually the first key in selectors)
-        if selectors_config:
+        elif selectors_config:
             # Look for common keys like 'jobs', 'items', 'results', etc.
             for key in ['jobs', 'items', 'results', 'listings', 'products']:
                 if key in selectors_config:
