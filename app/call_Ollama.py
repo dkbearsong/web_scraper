@@ -55,7 +55,7 @@ class OllamaClient:
         except json.JSONDecodeError:
             return None
 
-    async def call(self, prompt: str, sch, temp=0.7, top_p=0.7, top_k=10, mt: int = 1024):
+    async def call(self, prompt: str, sch, temp=0.7, top_p=0.7, top_k=10, mt: int = 1024, thinking: bool = False):
         url = f"{self.base_url}/api/chat"
         headers = {"Content-Type": "application/json"}
 
@@ -74,8 +74,13 @@ class OllamaClient:
                 "max_tokens": mt,
             },
         }
+        
+        # Add thinking options if enabled
+        if thinking:
+            payload["options"]["num_ctx"] = 42768  # Increase context for thinking
+            payload["options"]["num_predict"] = 9192  # Allow longer responses for thinking
 
-        timeout = aiohttp.ClientTimeout(total=3600)
+        timeout = aiohttp.ClientTimeout(total=4600)
 
         async with self.session.post(url, headers=headers, json=payload, timeout=timeout) as resp:
             if resp.status != 200:
@@ -173,7 +178,7 @@ async def main():
     session = aiohttp.ClientSession()
     client = OllamaClient(session, model="hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M",
                           system_message=SYSTEM_MESSAGE)
-    result = await client.call(user_prompt, json_schema, temp, top_p, top_k, mt)
+    result = await client.call(user_prompt, json_schema, temp, top_p, top_k, mt, thinking=False)
     await client.unload()
     await client.session.close()
     print(result)

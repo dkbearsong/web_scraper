@@ -2,6 +2,9 @@ from abc import ABC, abstractmethod
 from bs4 import BeautifulSoup, Tag
 from typing import Dict, List, Any, Optional, Union
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ==================== Extraction Strategies ====================
 
@@ -9,14 +12,14 @@ class ExtractionStrategy(ABC):
     """Base class for extraction strategies"""
     
     @abstractmethod
-    def extract(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    def extract(self, soup: BeautifulSoup, url: str, debug: bool = False) -> Dict[str, Any]:
         """Extract data from BeautifulSoup object"""
         pass
 
 class GenericStrategy(ExtractionStrategy):
     """Generic extraction - gets common elements"""
     
-    def extract(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    def extract(self, soup: BeautifulSoup, url: str, debug: bool = False) -> Dict[str, Any]:
         return {
             'title': soup.title.string if soup.title else None,
             'headings': [h.get_text(strip=True) for h in soup.find_all(['h1', 'h2', 'h3'])],
@@ -86,10 +89,16 @@ class SelectorStrategy(ExtractionStrategy):
         """
         self.selectors = selectors
     
-    def extract(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    def extract(self, soup: BeautifulSoup, url: str, debug: bool = False) -> Dict[str, Any]:
+        logger.debug(f"SelectorStrategy.extract() - Extracting {len(self.selectors)} fields from {url}")
         result = {}
         for key, selector_config in self.selectors.items():
+            logger.debug(f"SelectorStrategy.extract() - Extracting field '{key}' with config: {str(selector_config)[:100]}...")
             result[key] = self._extract_field(soup, selector_config)
+            if isinstance(result[key], list):
+                logger.debug(f"SelectorStrategy.extract() - Field '{key}' extracted {len(result[key])} items")
+            else:
+                logger.debug(f"SelectorStrategy.extract() - Field '{key}' extracted: {str(result[key])[:100]}")
         return result
     
     def _extract_field(self, soup: BeautifulSoup, config: Any) -> Any:
@@ -271,7 +280,7 @@ class SelectorStrategy(ExtractionStrategy):
 class ProductStrategy(ExtractionStrategy):
     """E-commerce product extraction"""
     
-    def extract(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    def extract(self, soup: BeautifulSoup, url: str, debug: bool = False) -> Dict[str, Any]:
         return {
             'product_name': self._find_by_patterns(soup, [
                 {'itemprop': 'name'},
@@ -302,7 +311,7 @@ class ProductStrategy(ExtractionStrategy):
 class ArticleStrategy(ExtractionStrategy):
     """News article/blog extraction"""
     
-    def extract(self, soup: BeautifulSoup, url: str) -> Dict[str, Any]:
+    def extract(self, soup: BeautifulSoup, url: str, debug: bool = False) -> Dict[str, Any]:
         return {
             'headline': self._get_headline(soup),
             'author': self._get_author(soup),

@@ -6,6 +6,7 @@ sql/
 .idea/
 __pycache__/
 app/__pycache__/
+/home/dereck/Documents/Projects/Python/web_scraper/test_files/
 
 .env
 log.json

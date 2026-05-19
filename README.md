@@ -110,7 +110,9 @@ curl -X POST http://localhost:5000/extract-js \
         "value": ".job-listing",
         "timeout": 10
       },
-      "headless": true
+      "headless": true,
+      "user_data_dir": "/home/youruser/.config/google-chrome",
+      "profile": "Default"
     }
   }'
 ```
@@ -182,46 +184,192 @@ curl -X POST http://localhost:5000/extract \
 
 **POST** `/extract-js`
 
-Extract data from JavaScript-rendered pages with full browser automation.
+Extract data from JavaScript-rendered pages with full browser automation and advanced interaction capabilities.
 
-**Request Body:**
+#### **Basic Usage**
+```bash
+curl -X POST http://localhost:5052/extract-js \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://react-spa.example.com",
+    "strategy": "selector",
+    "selectors": {
+      "title": "h1",
+      "content": ".main-content"
+    },
+    "js_config": {
+      "headless": true,
+      "wait": {
+        "type": "element",
+        "value": ".main-content",
+        "timeout": 10
+      }
+    }
+  }'
+```
+
+#### **Request Body Parameters**
+
+**Required:**
+- `url` (string): Target URL to extract from
+- `strategy` (string): Extraction strategy - `generic`, `product`, `article`, or `selector`
+
+**Optional:**
+- `selectors` (object): CSS selectors for extraction (required for `selector` strategy)
+- `js_config` (object): JavaScript rendering configuration (see below)
+
+#### **JavaScript Configuration (`js_config`)**
+
+**Browser Settings:**
 ```json
 {
-  "url": "https://example.com",
-  "strategy": "selector",
-  "selectors": {
-    "title": "h1",
-    "jobs": {
-      "selector": "table tr",
-      "extract": "table",
-      "columns": [
-        {"name": "title", "selector": "td:first-child", "extract": "text"},
-        {"name": "link", "selector": "td:first-child a@href"}
-      ]
-    }
-  },
   "js_config": {
-    "iframe": "iframe[src*='ashbyhq.com']",
-    "wait": {
-      "type": "element",
-      "value": "table",
-      "timeout": 10
-    },
-    "actions": [
-      {"type": "click", "selector": "#accept-cookies", "use_js": true},
-      {"type": "wait", "seconds": 2},
-      {"type": "scroll", "max_scrolls": 3}
-    ],
-    "headless": true
+    "headless": true,
+    "user_data_dir": "/path/to/.config/google-chrome",
+    "profile": "Default",
+    "debug": false
+  }
+}
+```
+- `headless` (bool, default: `true`): Run Chrome in headless mode
+- `user_data_dir` (string): Path to Chrome user data directory (enables cookie persistence)
+- `profile` (string): Chrome profile name (e.g., "Default", "Profile 1")
+- `debug` (bool, default: `false`): Enable debug logging and HTML output
+
+**Wait Strategies:**
+
+The `wait` configuration determines when to consider the page "ready" for extraction:
+
+```json
+{
+  "wait": {
+    "type": "time",
+    "value": 3,
+    "timeout": 10
   }
 }
 ```
 
-**Key Features:**
-- Iframe switching support
-- Multiple wait strategies
-- Action sequences (click, scroll, execute scripts)
-- Automatic overlay dismissal
+Available wait types:
+
+| Type | Value | Description |
+|------|-------|-------------|
+| `time` | seconds (number) | Wait fixed seconds (e.g., 3) |
+| `element` | CSS selector | Wait for element to appear (timeout in seconds) |
+| `script` | JavaScript code | Wait for custom JS condition (e.g., `return document.readyState === 'complete'`) |
+| `network_idle` | N/A | Wait for network activity to settle |
+
+Examples:
+```json
+{
+  "wait": {
+    "type": "element",
+    "value": ".content-loaded",
+    "timeout": 15
+  }
+}
+```
+
+```json
+{
+  "wait": {
+    "type": "script",
+    "value": "return document.querySelectorAll('.job-card').length > 0",
+    "timeout": 20
+  }
+}
+```
+
+**Action Sequences:**
+
+Perform automated interactions before extraction:
+
+```json
+{
+  "actions": [
+    {"type": "click", "selector": "#accept-cookies", "use_js": true},
+    {"type": "wait", "seconds": 2},
+    {"type": "scroll", "max_scrolls": 5, "pause_time": 1.5},
+    {"type": "click_until_gone", "selector": ".load-more", "max_clicks": 20},
+    {"type": "load_all", "method": "scroll", "selector": ".load-more", "max_iterations": 10},
+    {"type": "script", "code": "document.querySelectorAll('.popup').forEach(el => el.remove())"}
+  ]
+}
+```
+
+Action types:
+
+| Type | Parameters | Description |
+|------|------------|-------------|
+| `click` | `selector`, `use_js` | Click an element (use_js=true for JS click) |
+| `wait` | `seconds` | Wait for specified seconds |
+| `scroll` | `max_scrolls`, `pause_time` | Scroll page down (pause between scrolls) |
+| `click_until_gone` | `selector`, `max_clicks` | Click element repeatedly until it disappears |
+| `load_all` | `method`, `selector`, `max_iterations` | Load all items (scroll or click method) |
+| `script` | `code` | Execute custom JavaScript |
+
+**Iframe Support:**
+
+Extract content from iframes:
+
+```json
+{
+  "js_config": {
+    "iframe": "iframe[src*='ashby']"
+  }
+}
+```
+
+#### **Complete Example: Complex SPA with Actions**
+```json
+{
+  "url": "https://careers.example.com/jobs",
+  "strategy": "selector",
+  "selectors": {
+    "jobs": {
+      "selector": ".job-card",
+      "columns": [
+        {"name": "title", "selector": ".title", "extract": "text"},
+        {"name": "location", "selector": ".location", "extract": "text"},
+        {"name": "link", "selector": "a@href"}
+      ]
+    }
+  },
+  "js_config": {
+    "headless": true,
+    "user_data_dir": "/home/user/.config/google-chrome",
+    "profile": "Default",
+    "wait": {
+      "type": "element",
+      "value": ".job-card",
+      "timeout": 15
+    },
+    "actions": [
+      {"type": "click", "selector": "#accept-all", "use_js": true},
+      {"type": "wait", "seconds": 2},
+      {"type": "scroll", "max_scrolls": 10, "pause_time": 1}
+    ],
+    "debug": false
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "url": "https://careers.example.com/jobs",
+  "data": {
+    "jobs": [
+      {
+        "title": "Software Engineer",
+        "location": "San Francisco, CA",
+        "link": "https://careers.example.com/jobs/123"
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -277,47 +425,210 @@ Crawl JavaScript-rendered pages with link following.
 
 **POST** `/extract-paginated`
 
-Handle paginated results with URL parameters or click-based pagination.
+Extract data from multi-page results with support for both URL-based pagination (page numbers in URL) and click-based pagination (clicking "Next" button). Handles both static and JavaScript-rendered pages.
 
-#### **URL-Based Pagination:**
+#### **Pagination Method 1: URL-Based Pagination**
+
+Use when page numbers are in the URL (e.g., `?page=1`, `?p=2`).
+
+**Request:**
 ```json
 {
-  "url_template": "https://jobs.example.com/search?page={page}",
+  "url_template": "https://jobs.example.com/search?keywords=python&page={page}",
   "start_page": 1,
-  "end_page": 20,
+  "end_page": 5,
   "strategy": "selector",
   "selectors": {
-    "jobs": ".job-listing"
+    "jobs": {
+      "selector": ".job-card",
+      "columns": [
+        {"name": "title", "selector": ".title", "extract": "text"},
+        {"name": "company", "selector": ".company", "extract": "text"},
+        {"name": "link", "selector": "a@href"}
+      ]
+    }
   },
   "delay": 1.5
 }
 ```
 
-#### **Click-Based Pagination:**
+**URL-Based Parameters:**
+- `url_template` (string, required): URL with `{page}` placeholder for page numbers
+- `start_page` (int, default: 1): First page number
+- `end_page` (int, default: 10): Last page number
+- `strategy` (string): Extraction strategy (`generic`, `product`, `article`, `selector`)
+- `selectors` (object): Selectors for data extraction
+- `delay` (float, default: 1.0): Delay between page requests (seconds)
+- `js_config` (object, optional): For JavaScript-rendered pages
+
+**Example with JavaScript Rendering:**
 ```json
 {
-  "url": "https://jobs.example.com",
+  "url_template": "https://react-jobs.app/search?q=python&page={page}",
+  "start_page": 1,
+  "end_page": 10,
+  "strategy": "selector",
+  "selectors": {
+    "title": ".job-title",
+    "company": ".company-name"
+  },
+  "js_config": {
+    "headless": true,
+    "wait": {
+      "type": "element",
+      "value": ".job-title",
+      "timeout": 10
+    },
+    "user_data_dir": "/home/user/.config/google-chrome",
+    "profile": "Default"
+  },
+  "delay": 2.0
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "total_pages": 5,
+  "data": [
+    {
+      "page": 1,
+      "url": "https://jobs.example.com/search?keywords=python&page=1",
+      "items": [
+        {"title": "Senior Python Dev", "company": "TechCorp", "link": "..."}
+      ]
+    },
+    {
+      "page": 2,
+      "url": "https://jobs.example.com/search?keywords=python&page=2",
+      "items": [...]
+    }
+  ]
+}
+```
+
+---
+
+#### **Pagination Method 2: Click-Based Pagination**
+
+Use when you click a "Next" button or similar element to load next page.
+
+**Basic Click Pagination:**
+```json
+{
+  "url": "https://jobs.example.com/search",
   "pagination": {
     "method": "click",
-    "next_selector": "a.pagination-link[title='Next']",
-    "max_pages": 20,
-    "wait_after_click": 3,
-    "use_js": true
+    "next_selector": "a.pagination-next",
+    "max_pages": 10,
+    "wait_after_click": 3
   },
   "strategy": "selector",
   "selectors": {
-    "jobs": {
-      "selector": ".job-card",
-      "extract": "table",
-      "columns": [
-        {"name": "title", "selector": ".title", "extract": "text"},
-        {"name": "link", "selector": "a@href"}
-      ]
-    }
+    "jobs": ".job-listing"
   },
   "js_config": {
-    "wait": {"type": "element", "value": ".job-card", "timeout": 10},
-    "headless": true
+    "headless": true,
+    "wait": {
+      "type": "element",
+      "value": ".job-listing",
+      "timeout": 10
+    }
+  }
+}
+```
+
+**Click-Based Parameters:**
+
+**pagination object:**
+- `method` (string, required): "click" for click-based pagination
+- `next_selector` (string, required): CSS selector for the "Next" button/link
+- `max_pages` (int, default: 10): Maximum number of pages to scrape
+- `wait_after_click` (float, default: 2): Wait time after clicking Next (seconds)
+- `use_js` (bool, default: true): Use JavaScript click instead of Selenium click
+- `content_change_selector` (string, optional): Selector to verify page content changed
+
+**js_config object:** Same as extract-js endpoint
+
+**Example: LinkedIn-Style Pagination**
+```json
+{
+  "url": "https://linkedin.com/jobs/search/?keywords=python",
+  "pagination": {
+    "method": "click",
+    "next_selector": "button.jobs-search-pagination__button--next",
+    "max_pages": 5,
+    "wait_after_click": 3,
+    "use_js": true,
+    "content_change_selector": "div.artdeco-entity-lockup"
+  },
+  "strategy": "selector",
+  "selectors": {
+    "title": "div.artdeco-entity-lockup__title a span strong",
+    "company": "div.artdeco-entity-lockup__subtitle span",
+    "location": "div.artdeco-entity-lockup__caption span[dir='ltr']",
+    "link": "div.artdeco-entity-lockup__title a@href"
+  },
+  "js_config": {
+    "headless": true,
+    "user_data_dir": "/home/user/.config/google-chrome",
+    "profile": "Default",
+    "wait": {
+      "type": "element",
+      "value": "div.artdeco-entity-lockup",
+      "timeout": 15
+    }
+  }
+}
+```
+
+**Content Change Detection:**
+
+Click-based pagination automatically detects when new content loads by comparing page content before/after the click. You can customize this detection:
+
+```json
+{
+  "pagination": {
+    "method": "click",
+    "next_selector": ".next-page",
+    "max_pages": 20,
+    "wait_after_click": 2,
+    "content_change_selector": ".item-card"
+  }
+}
+```
+
+The scraper will:
+1. Get a snapshot of content matching `content_change_selector` before click
+2. Click the Next button
+3. Wait for new content to appear (verifying actual page change)
+4. Extract data from new content
+5. Repeat until Next button disappears or max_pages reached
+
+**Advanced: Initial Actions**
+
+Perform setup actions before pagination starts:
+
+```json
+{
+  "url": "https://example.com/jobs",
+  "pagination": {
+    "method": "click",
+    "next_selector": ".next-btn",
+    "max_pages": 10,
+    "wait_after_click": 2
+  },
+  "strategy": "selector",
+  "selectors": {"jobs": ".job-card"},
+  "js_config": {
+    "headless": true,
+    "wait": {"type": "time", "value": 2},
+    "actions": [
+      {"type": "click", "selector": "#filters"},
+      {"type": "wait", "seconds": 1},
+      {"type": "scroll", "max_scrolls": 3}
+    ]
   }
 }
 ```
@@ -326,19 +637,39 @@ Handle paginated results with URL parameters or click-based pagination.
 ```json
 {
   "success": true,
-  "total_pages": 20,
-  "pages": [
+  "total_pages": 5,
+  "data": [
     {
       "page": 1,
-      "url": "https://jobs.example.com",
-      "data": {"jobs": [...]}
+      "url": "https://jobs.example.com/search",
+      "items": [
+        {
+          "title": "Senior Python Developer",
+          "company": "TechCorp",
+          "location": "Remote",
+          "link": "https://..."
+        }
+      ]
     },
     {
       "page": 2,
-      "url": "https://jobs.example.com",
-      "data": {"jobs": [...]}
+      "url": "https://jobs.example.com/search",
+      "items": [...]
     }
   ]
+}
+```
+
+**Error Handling:**
+
+If pagination stops before reaching `max_pages`, the response will include information about why:
+
+```json
+{
+  "success": true,
+  "total_pages": 3,
+  "stopped_reason": "No next button found on page 3",
+  "data": [...]
 }
 ```
 

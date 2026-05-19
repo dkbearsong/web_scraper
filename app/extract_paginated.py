@@ -9,6 +9,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from typing import Dict, Any
 from app.javascript_renderer import JavaScriptRenderer
 from app.extraction_strategies import StrategyFactory
+import os
+import datetime
+import logging
+
+logger = logging.getLogger(__name__)
 
 class paginated:
     def _extract_url_pagination(self, data: Dict) -> Any:
@@ -21,6 +26,7 @@ class paginated:
         # Check if JS rendering is needed
         use_js = 'js_config' in data
         js_config = data.get('js_config', {})
+        debug = js_config.get('debug', False)
         
         # Create strategy
         strategy_type = data.get('strategy', 'generic')
@@ -34,10 +40,12 @@ class paginated:
         if use_js:
             # Use Selenium for JS-rendered pages
             headless = js_config.get('headless', True)
+            user_data_dir = js_config.get('user_data_dir')
+            profile = js_config.get('profile')
             wait_config = js_config.get('wait')
             actions = js_config.get('actions', [])
             
-            with JavaScriptRenderer(headless=headless) as renderer:
+            with JavaScriptRenderer(headless=headless, user_data_dir=user_data_dir, profile=profile) as renderer:
                 for page_num in range(start_page, end_page + 1):
                     try:
                         url = url_template.format(page=page_num)
@@ -51,10 +59,31 @@ class paginated:
                         
                         # Get final HTML
                         html = renderer.driver.page_source
+                        
                         soup = BeautifulSoup(html, 'html.parser')
                         
                         # Extract data
-                        page_data = strategy.extract(soup, url)
+                        page_data = strategy.extract(soup, url, debug=debug)
+                        
+                        # Count extracted items
+                        item_count = 0
+                        if isinstance(page_data, dict):
+                            for v in page_data.values():
+                                if isinstance(v, list):
+                                    item_count = len(v)
+                                    break
+                        elif isinstance(page_data, list):
+                            item_count = len(page_data)
+                        
+                        # Log summary: always report extraction success and count
+                        logger.info(f"Extracted {item_count} items from page {page_num}")
+                        
+                        # Debug: log extraction details (goes to debug.log only)
+                        if debug:
+                            logger.debug(f"URL: {url}")
+                            logger.debug(f"Strategy type: {strategy_type}")
+                            if hasattr(strategy, 'selectors') and strategy.selectors:
+                                logger.debug(f"Selectors used: {strategy.selectors}")
                         
                         all_results.append({
                             'page': page_num,
@@ -84,7 +113,7 @@ class paginated:
                         soup = BeautifulSoup(response.content, 'html.parser')
                         
                         # Extract data
-                        page_data = strategy.extract(soup, url)
+                        page_data = strategy.extract(soup, url, debug=False)
                         
                         all_results.append({
                             'page': page_num,
@@ -148,7 +177,10 @@ class paginated:
         use_js_click = pagination_config.get('use_js', True)  # Default to JS click for pagination
         
         js_config = data.get('js_config', {})
+        debug = js_config.get('debug', False)
         headless = js_config.get('headless', True)
+        user_data_dir = js_config.get('user_data_dir')
+        profile = js_config.get('profile')
         wait_config = js_config.get('wait')
         initial_actions = js_config.get('actions', [])
         
@@ -184,7 +216,7 @@ class paginated:
         
         all_results = []
         
-        with JavaScriptRenderer(headless=headless) as renderer:
+        with JavaScriptRenderer(headless=headless, user_data_dir=user_data_dir, profile=profile) as renderer:
             # Load initial page
             html = renderer.render_page(url, wait_config)
             
@@ -223,10 +255,11 @@ class paginated:
                     
                     # Get current page HTML
                     html = renderer.driver.page_source
+                    
                     soup = BeautifulSoup(html, 'html.parser')
                     
                     # Extract data
-                    page_data = strategy.extract(soup, renderer.driver.current_url)
+                    page_data = strategy.extract(soup, renderer.driver.current_url, debug=debug)
                     
                     # Count items extracted for logging
                     item_count = 0
@@ -239,13 +272,21 @@ class paginated:
                     elif isinstance(page_data, list):
                         item_count = len(page_data)
                     
+                    # Log summary: always report extraction success and count
+                    logger.info(f"Extracted page {page_num}, found {item_count} items")
+                    
+                    # Debug: log extraction details (goes to debug.log only)
+                    if debug:
+                        logger.debug(f"URL: {renderer.driver.current_url}")
+                        logger.debug(f"Strategy type: {strategy_type}")
+                        if hasattr(strategy, 'selectors') and strategy.selectors:
+                            logger.debug(f"Selectors used: {strategy.selectors}")
+                    
                     all_results.append({
                         'page': page_num,
                         'url': renderer.driver.current_url,
                         'data': page_data
                     })
-                
-                    print(f"Extracted page {page_num}, found {item_count} items")
                 
                     # Try to click next button
                     if page_num < max_pages:
@@ -274,7 +315,7 @@ class paginated:
                                         'is-disabled' in parent_class or
                                         element.get_attribute('aria-disabled') == 'true')
                             if is_disabled:
-                                print(f"Next button is disabled on page {page_num}, stopping")
+                                logger.info(f"Next button is disabled on page {page_num}, stopping")
                                 break
                             
                             # Scroll element into center of viewport
@@ -287,7 +328,7 @@ class paginated:
                             # Try to dismiss any overlays
                             renderer._dismiss_common_overlays()
                             
-                            print(f"Clicking next button for page {page_num + 1}...")
+                            logger.debug(f"Clicking next button for page {page_num + 1}...")
                             
                             # Use JavaScript click (more reliable for pagination)
                             if use_js_click:
@@ -313,9 +354,9 @@ class paginated:
                                     WebDriverWait(renderer.driver, 10).until(
                                         EC.presence_of_element_located((By.CSS_SELECTOR, job_selector))
                                     )
-                                    print(f"Job listings appeared after click")
+                                    logger.debug(f"Job listings appeared after click")
                                 except TimeoutException:
-                                    print(f"Warning: Job listings did not appear within timeout, continuing anyway")
+                                    logger.warning(f"Job listings did not appear within timeout, continuing anyway")
                             
                             # Verify content actually changed
                             content_changed = False
@@ -350,23 +391,18 @@ class paginated:
                                     time.sleep(0.5)
                             
                             if not content_changed:
-                                print(f"Warning: Content didn't change after clicking next on page {page_num}, stopping")
-                                print(f"Old marker: {old_content_marker[:100] if old_content_marker else 'None'}...")
-                                print(f"New marker: {new_content_marker[:100] if 'new_content_marker' in locals() and new_content_marker else 'None'}...")
+                                logger.warning(f"Content didn't change after clicking next on page {page_num}, stopping")
+                                logger.debug(f"Old marker: {old_content_marker[:100] if old_content_marker else 'None'}...")
+                                logger.debug(f"New marker: {new_content_marker[:100] if 'new_content_marker' in locals() and new_content_marker else 'None'}...")
                                 break
                             
-                        except (TimeoutException, NoSuchElementException) as e:
-                            # No more pages
-                            print(f"No next button found on page {page_num}: {e}")
-                            break
                         except Exception as e:
-                            print(f"Error clicking next button on page {page_num}: {e}")
-                            import traceback
-                            traceback.print_exc()
+                            # No more pages - catch any exception during element finding/clicking
+                            logger.info(f"No next button found on page {page_num}: {type(e).__name__}: {e}")
                             break
                             
                 except Exception as e:
-                    print(f"Error on page {page_num}: {e}")
+                    logger.error(f"Error on page {page_num}: {e}")
                     import traceback
                     traceback.print_exc()
                     all_results.append({

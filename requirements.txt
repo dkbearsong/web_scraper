@@ -1,3 +1,4 @@
+aiohttp==3.10.10
 attrs==25.4.0
 beautifulsoup4==4.14.3
 blinker==1.9.0
@@ -20,7 +21,7 @@ PySocks==1.7.1
 python-dotenv==1.2.1
 requests==2.32.5
 requests-toolbelt==1.0.0
-selenium==4.39.0
+selenium>=4.39.0  # bumpable; required for Chrome profile args
 sniffio==1.3.1
 sortedcontainers==2.4.0
 soupsieve==2.8.1
