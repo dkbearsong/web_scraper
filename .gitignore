@@ -11,3 +11,4 @@ app/__pycache__/
 .env
 log.json
 job_sites.csv
+
