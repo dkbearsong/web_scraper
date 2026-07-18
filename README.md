@@ -227,7 +227,9 @@ curl -X POST http://localhost:5052/extract-js \
     "headless": true,
     "user_data_dir": "/path/to/.config/google-chrome",
     "profile": "Default",
-    "debug": false
+    "debug": false,
+    "block_images": false,
+    "page_load_strategy": "normal"
   }
 }
 ```
@@ -235,6 +237,8 @@ curl -X POST http://localhost:5052/extract-js \
 - `user_data_dir` (string): Path to Chrome user data directory (enables cookie persistence)
 - `profile` (string): Chrome profile name (e.g., "Default", "Profile 1")
 - `debug` (bool, default: `false`): Enable debug logging and HTML output
+- `block_images` (bool, default: `false`): Disable loading of images to save bandwidth and speed up page load
+- `page_load_strategy` (string, default: `"normal"`): Configures Selenium's page load strategy. Options: `"normal"`, `"eager"` (DOM interactive, does not wait for stylesheets/images), `"none"`.
 
 **Wait Strategies:**
 
@@ -1354,6 +1358,10 @@ export CHROME_BIN=/usr/bin/google-chrome
 4. **Use specific selectors** - More specific = faster extraction
 5. **Enable headless mode** - Always use `"headless": true` in production
 6. **Batch operations** - Use table extraction instead of multiple selectors
+7. **Disable images & Use Eager Page Loading** - Set `"block_images": true` and `"page_load_strategy": "eager"` in `js_config` to stop waiting for images and stylesheets.
+8. **Asynchronous & Concurrent Execution**:
+   - The service processes requests targeting *different* domains asynchronously in parallel.
+   - Requests targeting the *same* domain are queued and processed sequentially with an automated, randomized 1-2 second pause between them to respect server rate-limits and avoid IP blocks.
 
 ### Security Considerations
 
@@ -1422,6 +1430,13 @@ For issues, questions, or feature requests, please open an issue on the project 
 ---
 
 ## Changelog
+
+### Version 2.1
+- Added domain-specific rate limiting and sequential queueing (1-2s randomized pauses) for concurrent requests
+- Enabled parallel asynchronous processing for requests targeting different domains
+- Added `block_images` browser configuration in `js_config` to speed up page rendering
+- Added `page_load_strategy` option in `js_config` (e.g. `"eager"`) for faster DOM-interactive loading
+- Fixed browser session isolation so concurrent JS-rendering runs do not terminate each other's Chrome processes
 
 ### Version 2.0
 - Added iframe support for embedded content
