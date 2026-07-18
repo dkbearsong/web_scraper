@@ -50,11 +50,15 @@ class JavaScriptRenderer:
         wait_time: int = 10,
         user_data_dir: Optional[str] = None,
         profile: Optional[str] = None,
+        block_images: bool = False,
+        page_load_strategy: str = 'normal',
     ):
         self.headless = headless
         self.wait_time = wait_time
         self.user_data_dir = os.path.expanduser(user_data_dir) if user_data_dir else None
         self.profile = profile
+        self.block_images = block_images
+        self.page_load_strategy = page_load_strategy
         self.driver = None
         self._profile_cookies = None  # Cache cookies extracted from profile
     
@@ -70,19 +74,40 @@ class JavaScriptRenderer:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - cleanup driver"""
         if self.driver:
+            chromedriver_pid = None
+            try:
+                chromedriver_pid = self.driver.service.process.pid
+            except Exception:
+                pass
+
+            child_pids = []
+            if chromedriver_pid:
+                try:
+                    import subprocess
+                    result = subprocess.run(['pgrep', '-P', str(chromedriver_pid)], capture_output=True, text=True, timeout=2)
+                    child_pids = [p.strip() for p in result.stdout.strip().split('\n') if p.strip().isdigit()]
+                except Exception:
+                    pass
+
             try:
                 self.driver.quit()
                 logger.debug("Driver closed cleanly")
             except Exception as e:
-                logger.warning(f"Error closing driver gracefully: {e}. Force closing...")
-                try:
-                    # Force kill the Chrome process if graceful shutdown fails
-                    import subprocess
-                    subprocess.run(['pkill', '-9', '-f', 'chromedriver|chrome'], 
-                                 capture_output=True, timeout=5)
-                    logger.debug("Force closed Chrome processes")
-                except Exception as force_close_error:
-                    logger.warning(f"Could not force close Chrome: {force_close_error}")
+                logger.warning(f"Error closing driver gracefully: {e}. Force closing our processes...")
+                if chromedriver_pid:
+                    try:
+                        import subprocess
+                        subprocess.run(['kill', '-9', str(chromedriver_pid)], capture_output=True, timeout=2)
+                        logger.debug(f"Force killed chromedriver PID {chromedriver_pid}")
+                    except Exception:
+                        pass
+                for pid in child_pids:
+                    try:
+                        import subprocess
+                        subprocess.run(['kill', '-9', str(pid)], capture_output=True, timeout=2)
+                        logger.debug(f"Force killed Chrome child PID {pid}")
+                    except Exception:
+                        pass
 
     
     def _extract_cookies_from_profile(self) -> list:
@@ -249,13 +274,6 @@ class JavaScriptRenderer:
         
         logger.debug(f"Creating driver: headless={self.headless}, profile={self.profile}")
         
-        # Kill any stale Chrome processes
-        try:
-            subprocess.run(['killall', '-9', 'chrome'], capture_output=True, timeout=2)
-        except:
-            pass
-        time_module.sleep(1)
-        
         # Determine if we'll use profile (only for non-headless debugging)
         display_available = os.environ.get('DISPLAY')
         use_profile = False
@@ -292,6 +310,13 @@ class JavaScriptRenderer:
         options.add_argument("--disable-gpu")
         options.add_argument("--window-size=1280,720")
         
+        # Page load strategy & image blocking configurations
+        options.page_load_strategy = self.page_load_strategy
+        if self.block_images:
+            logger.debug("Disabling images for faster page load")
+            prefs = {"profile.managed_default_content_settings.images": 2}
+            options.add_experimental_option("prefs", prefs)
+        
         # Bypass WebDriver detection (some sites check for this)
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         options.add_experimental_option("useAutomationExtension", False)
@@ -312,21 +337,8 @@ class JavaScriptRenderer:
                 logger.warning(f"Attempt {attempt + 1} failed: {err_msg}")
                 if attempt < 2:
                     time_module.sleep(2)
-                    try:
-                        subprocess.run(['killall', '-9', 'chrome'], capture_output=True, timeout=1)
-                    except:
-                        pass
         
         raise RuntimeError("Failed to create Chrome driver")
-    
-    def __enter__(self):
-        """Context manager entry - initialize driver and extract cookies"""
-        self.driver = self._create_driver()
-        # Extract and cache cookies from profile (for later injection)
-        if self.user_data_dir and self.profile:
-            logger.debug("Extracting cookies from Chrome profile for caching...")
-            self._profile_cookies = self._extract_cookies_from_profile()
-        return self
     
     def render_page(self, url: str, wait_config: Optional[Dict] = None, iframe_selector: Optional[str] = None) -> str:
         """

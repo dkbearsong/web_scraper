@@ -44,8 +44,16 @@ class paginated:
             profile = js_config.get('profile')
             wait_config = js_config.get('wait')
             actions = js_config.get('actions', [])
+            block_images = js_config.get('block_images', False)
+            page_load_strategy = js_config.get('page_load_strategy', 'normal')
             
-            with JavaScriptRenderer(headless=headless, user_data_dir=user_data_dir, profile=profile) as renderer:
+            with JavaScriptRenderer(
+                headless=headless,
+                user_data_dir=user_data_dir,
+                profile=profile,
+                block_images=block_images,
+                page_load_strategy=page_load_strategy,
+            ) as renderer:
                 for page_num in range(start_page, end_page + 1):
                     try:
                         url = url_template.format(page=page_num)
@@ -183,6 +191,8 @@ class paginated:
         profile = js_config.get('profile')
         wait_config = js_config.get('wait')
         initial_actions = js_config.get('actions', [])
+        block_images = js_config.get('block_images', False)
+        page_load_strategy = js_config.get('page_load_strategy', 'normal')
         
         # Extract job/item selector from config for content change detection
         selectors_config = data.get('selectors', {})
@@ -216,7 +226,13 @@ class paginated:
         
         all_results = []
         
-        with JavaScriptRenderer(headless=headless, user_data_dir=user_data_dir, profile=profile) as renderer:
+        with JavaScriptRenderer(
+            headless=headless,
+            user_data_dir=user_data_dir,
+            profile=profile,
+            block_images=block_images,
+            page_load_strategy=page_load_strategy,
+        ) as renderer:
             # Load initial page
             html = renderer.render_page(url, wait_config)
             

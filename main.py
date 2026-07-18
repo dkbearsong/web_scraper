@@ -23,6 +23,75 @@ from app.page_analyzer import PageAnalyzer
 from app.crawler import WebCrawler, JSWebCrawler
 from app.javascript_renderer import JavaScriptRenderer
 from app.extract_paginated import paginated
+import threading
+from urllib.parse import urlparse
+from random import uniform
+from functools import wraps
+
+class DomainLockManager:
+    def __init__(self):
+        self.locks = {}
+        self.last_finish_times = {}
+        self.manager_lock = threading.Lock()
+
+    def get_lock(self, domain: str):
+        with self.manager_lock:
+            if domain not in self.locks:
+                self.locks[domain] = threading.Lock()
+            return self.locks[domain]
+
+    def record_finish(self, domain: str):
+        with self.manager_lock:
+            self.last_finish_times[domain] = time.time()
+
+    def get_last_finish(self, domain: str) -> float:
+        with self.manager_lock:
+            return self.last_finish_times.get(domain, 0.0)
+
+domain_lock_manager = DomainLockManager()
+
+def limit_domain_concurrency(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        try:
+            data = request.get_json(silent=True) or {}
+        except Exception:
+            data = {}
+        
+        url = data.get('url') or data.get('url_template') or request.args.get('url')
+        
+        if not url:
+            return f(*args, **kwargs)
+            
+        try:
+            parsed = urlparse(url)
+            domain = parsed.netloc or parsed.path
+        except Exception:
+            domain = None
+            
+        if not domain:
+            return f(*args, **kwargs)
+            
+        lock = domain_lock_manager.get_lock(domain)
+        logger.info(f"Acquiring lock for domain: {domain}")
+        with lock:
+            last_finish = domain_lock_manager.get_last_finish(domain)
+            if last_finish > 0:
+                pause_time = uniform(1.0, 2.0)
+                elapsed = time.time() - last_finish
+                wait_time = pause_time - elapsed
+                if wait_time > 0:
+                    logger.info(f"Waiting {wait_time:.2f}s before starting next request on domain: {domain}")
+                    time.sleep(wait_time)
+            
+            logger.info(f"Starting request on domain: {domain}")
+            try:
+                return f(*args, **kwargs)
+            finally:
+                domain_lock_manager.record_finish(domain)
+                logger.info(f"Finished request on domain: {domain}")
+                
+    return decorated_function
 
 app = Flask(__name__)
 
@@ -100,6 +169,7 @@ def health():
     return jsonify({'status': 'healthy', 'service': 'web-crawler'})
 
 @app.route('/crawl', methods=['POST'])
+@limit_domain_concurrency
 def crawl():
     """
     Main crawling endpoint
@@ -183,6 +253,7 @@ def list_strategies():
     })
 
 @app.route('/analyze', methods=['POST'])
+@limit_domain_concurrency
 def analyze_page():
     """
     Analyze page structure to build custom extraction strategy
@@ -224,6 +295,7 @@ def analyze_page():
         return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract', methods=['POST'])
+@limit_domain_concurrency
 def quick_extract():
     """
     Quick single-page extraction
@@ -297,6 +369,7 @@ def quick_extract():
         return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract-js', methods=['POST'])
+@limit_domain_concurrency
 def extract_js():
     """
     Extract data from JavaScript-rendered pages using Selenium
@@ -333,7 +406,7 @@ def extract_js():
         logger.debug(f"extract_js() - Endpoint called with url={data.get('url') if data else 'N/A'}")
         
         if not data or 'url' not in data:
-            logger.warning(f"extract_js() - Missing URL in request")
+            logger.warning(f"quick_extract() - Missing URL in request")
             return jsonify({'status_code': 400, 'error': 'URL is required'}), 400
         
         url = data['url']
@@ -347,11 +420,13 @@ def extract_js():
         profile = js_config.get('profile')
         iframe_selector = js_config.get('iframe')  # NEW: Extract iframe selector
         debug = js_config.get('debug', False)
+        block_images = js_config.get('block_images', False)
+        page_load_strategy = js_config.get('page_load_strategy', 'normal')
 
         # log the parsed JS configuration for troubleshooting
         logger.debug(
             "Parsed js_config: headless=%s, user_data_dir=%s, profile=%s, "
-            "actions=%s, wait=%s, iframe=%s, debug=%s",
+            "actions=%s, wait=%s, iframe=%s, debug=%s, block_images=%s, page_load_strategy=%s",
             headless,
             user_data_dir,
             profile,
@@ -359,6 +434,8 @@ def extract_js():
             wait_config,
             iframe_selector,
             debug,
+            block_images,
+            page_load_strategy,
         )
 
         # Render page with Selenium
@@ -366,6 +443,8 @@ def extract_js():
             headless=headless,
             user_data_dir=user_data_dir,
             profile=profile,
+            block_images=block_images,
+            page_load_strategy=page_load_strategy,
         ) as renderer:
             
             # Navigate to URL and wait for initial content
@@ -506,6 +585,7 @@ def extract_js():
         return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/crawl-js', methods=['POST'])
+@limit_domain_concurrency
 def crawl_js():
     """
     Multi-page crawling with JavaScript rendering support
@@ -575,6 +655,7 @@ def crawl_js():
         return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/extract-paginated', methods=['POST'])
+@limit_domain_concurrency
 def extract_paginated():
     """
     Extract data from paginated results (numbered pages)
@@ -625,6 +706,7 @@ def extract_paginated():
         return jsonify({'status_code': 500, 'error': str(e)}), 500
 
 @app.route('/generate-strategy', methods=['POST'])
+@limit_domain_concurrency
 def generate_strategy():
     """
     Generate extraction strategy using Ollama analysis

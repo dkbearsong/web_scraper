@@ -1,0 +1,67 @@
+2026-07-18 07:16:56,142 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:16:56,393 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:16:56,408 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:17:00,770 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:17:00,988 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:17:01,005 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:25:50,151 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:25:50,378 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:25:50,393 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:07,990 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:08,261 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:08,275 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:10,752 - __main__ - INFO - Acquiring lock for domain: httpbin.org
+2026-07-18 07:26:10,752 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:10,752 - __main__ - INFO - Starting request on domain: httpbin.org
+2026-07-18 07:26:10,752 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:10,886 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:10,899 - __main__ - INFO - Finished request on domain: httpbin.org
+2026-07-18 07:26:10,902 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:10,902 - __main__ - INFO - Waiting 1.33s before starting next request on domain: example.com
+2026-07-18 07:26:11,007 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:12,235 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:12,354 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:12,355 - __main__ - INFO - Waiting 1.85s before starting next request on domain: example.com
+2026-07-18 07:26:14,208 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:14,325 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:36,733 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:36,985 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:37,004 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:39,526 - __main__ - INFO - Acquiring lock for domain: httpbin.org
+2026-07-18 07:26:39,527 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:39,527 - __main__ - INFO - Starting request on domain: httpbin.org
+2026-07-18 07:26:39,527 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:39,528 - WDM - INFO - ====== WebDriver manager ======
+2026-07-18 07:26:39,528 - WDM - INFO - ====== WebDriver manager ======
+2026-07-18 07:26:39,721 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,721 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,901 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,901 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,991 - WDM - INFO - There is no [mac64] chromedriver "150.0.7871.124" for browser google-chrome "150.0.7871" in cache
+2026-07-18 07:26:39,996 - WDM - INFO - There is no [mac64] chromedriver "150.0.7871.124" for browser google-chrome "150.0.7871" in cache
+2026-07-18 07:26:40,010 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:40,010 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:40,444 - WDM - INFO - WebDriver version 150.0.7871.124 selected
+2026-07-18 07:26:40,444 - WDM - INFO - WebDriver version 150.0.7871.124 selected
+2026-07-18 07:26:40,448 - WDM - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,688 - WDM - INFO - Driver downloading response is 200
+2026-07-18 07:26:40,744 - WDM - INFO - Driver downloading response is 200
+2026-07-18 07:26:41,599 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:41,643 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:41,918 - WDM - INFO - Driver has been saved in cache [/Users/dbearsong/.wdm/drivers/chromedriver/mac64/150.0.7871.124]
+2026-07-18 07:26:41,933 - WDM - INFO - Driver has been saved in cache [/Users/dbearsong/.wdm/drivers/chromedriver/mac64/150.0.7871.124]
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - ✓ Chrome driver created successfully
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - ✓ Chrome driver created successfully
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - [render_page] Starting - Loading URL: https://example.com
+2026-07-18 07:26:43,795 - app.javascript_renderer - INFO - [render_page] Starting - Loading URL: https://httpbin.org/html
+2026-07-18 07:26:43,918 - app.javascript_renderer - INFO - [render_page] ✓ Navigation completed in 0.12s
+2026-07-18 07:26:44,321 - app.javascript_renderer - INFO - [render_page] ✓ Navigation completed in 0.52s
+2026-07-18 07:26:44,936 - app.javascript_renderer - INFO - [render_page] ✓ Page render successful (161 bytes)
+2026-07-18 07:26:45,057 - __main__ - INFO - Extracted 1 items from https://httpbin.org/html
+2026-07-18 07:26:45,057 - __main__ - INFO - Finished request on domain: httpbin.org
+2026-07-18 07:26:45,344 - app.javascript_renderer - INFO - [render_page] ✓ Page render successful (544 bytes)
+2026-07-18 07:26:45,451 - __main__ - INFO - Extracted 1 items from https://example.com
+2026-07-18 07:26:45,451 - __main__ - INFO - Finished request on domain: example.com

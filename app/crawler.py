@@ -135,18 +135,24 @@ class JSWebCrawler(WebCrawler):
             headless = self.js_config.get('headless', True)
             user_data_dir = self.js_config.get('user_data_dir')
             profile = self.js_config.get('profile')
+            block_images = self.js_config.get('block_images', False)
+            page_load_strategy = self.js_config.get('page_load_strategy', 'normal')
 
             logger.debug(
-                "Initializing JavaScriptRenderer with headless=%s, user_data_dir=%s, profile=%s",
+                "Initializing JavaScriptRenderer with headless=%s, user_data_dir=%s, profile=%s, block_images=%s, page_load_strategy=%s",
                 headless,
                 user_data_dir,
                 profile,
+                block_images,
+                page_load_strategy,
             )
 
             self.renderer = JavaScriptRenderer(
                 headless=headless,
                 user_data_dir=user_data_dir,
                 profile=profile,
+                block_images=block_images,
+                page_load_strategy=page_load_strategy,
             )
             self.renderer.__enter__()
         return self.renderer

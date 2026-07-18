@@ -1,0 +1,177 @@
+2026-07-18 07:16:56,142 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:16:56,142 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:16:56,393 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:16:56,393 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:16:56,408 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:17:00,770 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:17:00,770 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:17:00,988 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:17:00,988 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:17:01,005 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:25:50,151 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:25:50,151 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:25:50,378 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:25:50,378 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:25:50,393 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:07,990 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:26:07,990 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:08,261 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:26:08,261 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:08,275 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:10,752 - __main__ - INFO - Acquiring lock for domain: httpbin.org
+2026-07-18 07:26:10,752 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:10,752 - __main__ - INFO - Starting request on domain: httpbin.org
+2026-07-18 07:26:10,752 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:10,752 - __main__ - DEBUG - quick_extract() - Endpoint called with url=http://httpbin.org/get
+2026-07-18 07:26:10,752 - __main__ - DEBUG - quick_extract() - Endpoint called with url=http://example.com
+2026-07-18 07:26:10,753 - __main__ - DEBUG - quick_extract() - Using strategy: generic
+2026-07-18 07:26:10,753 - __main__ - DEBUG - quick_extract() - Using strategy: generic
+2026-07-18 07:26:10,753 - __main__ - DEBUG - quick_extract() - Starting crawl
+2026-07-18 07:26:10,753 - __main__ - DEBUG - quick_extract() - Starting crawl
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - crawl() - Starting crawl from http://example.com, max_depth=0, max_pages=1
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - _crawl_recursive() - depth=0, url=http://example.com
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - _crawl_recursive() - Fetching http://example.com (attempt 1 with requests)
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - crawl() - Starting crawl from http://httpbin.org/get, max_depth=0, max_pages=1
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - _crawl_recursive() - depth=0, url=http://httpbin.org/get
+2026-07-18 07:26:10,777 - app.crawler - DEBUG - _crawl_recursive() - Fetching http://httpbin.org/get (attempt 1 with requests)
+2026-07-18 07:26:10,882 - app.crawler - DEBUG - _crawl_recursive() - Got response: status=200, content_length=559
+2026-07-18 07:26:10,885 - charset_normalizer - DEBUG - Encoding detection: ascii is most likely the one.
+2026-07-18 07:26:10,886 - app.crawler - DEBUG - _crawl_recursive() - Parsing HTML, extracting data with GenericStrategy
+2026-07-18 07:26:10,886 - app.crawler - DEBUG - _crawl_recursive() - Extraction complete. Extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:10,886 - app.crawler - DEBUG - _crawl_recursive() - Result added. Total results: 1
+2026-07-18 07:26:10,886 - app.crawler - DEBUG - crawl() - Completed. Results: 1 pages visited
+2026-07-18 07:26:10,886 - __main__ - DEBUG - quick_extract() - Crawl complete, got 1 results
+2026-07-18 07:26:10,886 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:10,898 - app.crawler - DEBUG - _crawl_recursive() - Got response: status=503, content_length=162
+2026-07-18 07:26:10,899 - charset_normalizer - DEBUG - Encoding detection: ascii is most likely the one.
+2026-07-18 07:26:10,899 - app.crawler - DEBUG - _crawl_recursive() - Parsing HTML, extracting data with GenericStrategy
+2026-07-18 07:26:10,899 - app.crawler - DEBUG - _crawl_recursive() - Extraction complete. Extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:10,899 - app.crawler - DEBUG - _crawl_recursive() - Result added. Total results: 1
+2026-07-18 07:26:10,899 - app.crawler - DEBUG - crawl() - Completed. Results: 1 pages visited
+2026-07-18 07:26:10,899 - __main__ - DEBUG - quick_extract() - Crawl complete, got 1 results
+2026-07-18 07:26:10,899 - __main__ - INFO - Finished request on domain: httpbin.org
+2026-07-18 07:26:10,902 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:10,902 - __main__ - INFO - Waiting 1.33s before starting next request on domain: example.com
+2026-07-18 07:26:11,007 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:12,235 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:12,235 - __main__ - DEBUG - quick_extract() - Endpoint called with url=http://example.com
+2026-07-18 07:26:12,235 - __main__ - DEBUG - quick_extract() - Using strategy: generic
+2026-07-18 07:26:12,235 - __main__ - DEBUG - quick_extract() - Starting crawl
+2026-07-18 07:26:12,261 - app.crawler - DEBUG - crawl() - Starting crawl from http://example.com, max_depth=0, max_pages=1
+2026-07-18 07:26:12,261 - app.crawler - DEBUG - _crawl_recursive() - depth=0, url=http://example.com
+2026-07-18 07:26:12,261 - app.crawler - DEBUG - _crawl_recursive() - Fetching http://example.com (attempt 1 with requests)
+2026-07-18 07:26:12,353 - app.crawler - DEBUG - _crawl_recursive() - Got response: status=200, content_length=559
+2026-07-18 07:26:12,353 - charset_normalizer - DEBUG - Encoding detection: ascii is most likely the one.
+2026-07-18 07:26:12,354 - app.crawler - DEBUG - _crawl_recursive() - Parsing HTML, extracting data with GenericStrategy
+2026-07-18 07:26:12,354 - app.crawler - DEBUG - _crawl_recursive() - Extraction complete. Extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:12,354 - app.crawler - DEBUG - _crawl_recursive() - Result added. Total results: 1
+2026-07-18 07:26:12,354 - app.crawler - DEBUG - crawl() - Completed. Results: 1 pages visited
+2026-07-18 07:26:12,354 - __main__ - DEBUG - quick_extract() - Crawl complete, got 1 results
+2026-07-18 07:26:12,354 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:12,355 - __main__ - INFO - Waiting 1.85s before starting next request on domain: example.com
+2026-07-18 07:26:14,208 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:14,209 - __main__ - DEBUG - quick_extract() - Endpoint called with url=http://example.com
+2026-07-18 07:26:14,209 - __main__ - DEBUG - quick_extract() - Using strategy: generic
+2026-07-18 07:26:14,209 - __main__ - DEBUG - quick_extract() - Starting crawl
+2026-07-18 07:26:14,234 - app.crawler - DEBUG - crawl() - Starting crawl from http://example.com, max_depth=0, max_pages=1
+2026-07-18 07:26:14,234 - app.crawler - DEBUG - _crawl_recursive() - depth=0, url=http://example.com
+2026-07-18 07:26:14,234 - app.crawler - DEBUG - _crawl_recursive() - Fetching http://example.com (attempt 1 with requests)
+2026-07-18 07:26:14,324 - app.crawler - DEBUG - _crawl_recursive() - Got response: status=200, content_length=559
+2026-07-18 07:26:14,324 - charset_normalizer - DEBUG - Encoding detection: ascii is most likely the one.
+2026-07-18 07:26:14,324 - app.crawler - DEBUG - _crawl_recursive() - Parsing HTML, extracting data with GenericStrategy
+2026-07-18 07:26:14,325 - app.crawler - DEBUG - _crawl_recursive() - Extraction complete. Extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:14,325 - app.crawler - DEBUG - _crawl_recursive() - Result added. Total results: 1
+2026-07-18 07:26:14,325 - app.crawler - DEBUG - crawl() - Completed. Results: 1 pages visited
+2026-07-18 07:26:14,325 - __main__ - DEBUG - quick_extract() - Crawl complete, got 1 results
+2026-07-18 07:26:14,325 - __main__ - INFO - Finished request on domain: example.com
+2026-07-18 07:26:36,733 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:26:36,733 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:36,985 - __main__ - DEBUG - === MAIN.PY INITIALIZED - DEBUG LOGGING ENABLED ===
+2026-07-18 07:26:36,985 - __main__ - INFO - === MAIN.PY INITIALIZED - INFO LOGGING ENABLED ===
+2026-07-18 07:26:37,004 - werkzeug - WARNING -  * Debugger is active!
+2026-07-18 07:26:39,526 - __main__ - INFO - Acquiring lock for domain: httpbin.org
+2026-07-18 07:26:39,527 - __main__ - INFO - Acquiring lock for domain: example.com
+2026-07-18 07:26:39,527 - __main__ - INFO - Starting request on domain: httpbin.org
+2026-07-18 07:26:39,527 - __main__ - DEBUG - extract_js() - Endpoint called with url=https://httpbin.org/html
+2026-07-18 07:26:39,527 - __main__ - INFO - Starting request on domain: example.com
+2026-07-18 07:26:39,527 - __main__ - DEBUG - Parsed js_config: headless=True, user_data_dir=None, profile=None, actions=[], wait={'type': 'time', 'value': 1}, iframe=None, debug=False, block_images=True, page_load_strategy=eager
+2026-07-18 07:26:39,527 - __main__ - DEBUG - extract_js() - Endpoint called with url=https://example.com
+2026-07-18 07:26:39,527 - app.javascript_renderer - DEBUG - Creating driver: headless=True, profile=None
+2026-07-18 07:26:39,527 - __main__ - DEBUG - Parsed js_config: headless=True, user_data_dir=None, profile=None, actions=[], wait={'type': 'time', 'value': 1}, iframe=None, debug=False, block_images=True, page_load_strategy=eager
+2026-07-18 07:26:39,527 - app.javascript_renderer - DEBUG - Headless mode (RECOMMENDED)
+2026-07-18 07:26:39,528 - app.javascript_renderer - DEBUG - Creating driver: headless=True, profile=None
+2026-07-18 07:26:39,528 - app.javascript_renderer - DEBUG - Disabling images for faster page load
+2026-07-18 07:26:39,528 - app.javascript_renderer - DEBUG - Headless mode (RECOMMENDED)
+2026-07-18 07:26:39,528 - app.javascript_renderer - DEBUG - Disabling images for faster page load
+2026-07-18 07:26:39,528 - WDM - INFO - ====== WebDriver manager ======
+2026-07-18 07:26:39,528 - WDM - INFO - ====== WebDriver manager ======
+2026-07-18 07:26:39,721 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,721 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,901 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,901 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:39,991 - WDM - INFO - There is no [mac64] chromedriver "150.0.7871.124" for browser google-chrome "150.0.7871" in cache
+2026-07-18 07:26:39,996 - WDM - INFO - There is no [mac64] chromedriver "150.0.7871.124" for browser google-chrome "150.0.7871" in cache
+2026-07-18 07:26:40,010 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:40,010 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:40,444 - WDM - INFO - WebDriver version 150.0.7871.124 selected
+2026-07-18 07:26:40,444 - WDM - INFO - WebDriver version 150.0.7871.124 selected
+2026-07-18 07:26:40,448 - WDM - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - Modern chrome version https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,453 - WDM - INFO - About to download new driver from https://storage.googleapis.com/chrome-for-testing-public/150.0.7871.124/mac-arm64/chromedriver-mac-arm64.zip
+2026-07-18 07:26:40,688 - WDM - INFO - Driver downloading response is 200
+2026-07-18 07:26:40,744 - WDM - INFO - Driver downloading response is 200
+2026-07-18 07:26:41,599 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:41,643 - WDM - INFO - Get LATEST chromedriver version for google-chrome
+2026-07-18 07:26:41,918 - WDM - INFO - Driver has been saved in cache [/Users/dbearsong/.wdm/drivers/chromedriver/mac64/150.0.7871.124]
+2026-07-18 07:26:41,918 - app.javascript_renderer - DEBUG - Driver creation attempt 1/3...
+2026-07-18 07:26:41,933 - WDM - INFO - Driver has been saved in cache [/Users/dbearsong/.wdm/drivers/chromedriver/mac64/150.0.7871.124]
+2026-07-18 07:26:41,935 - app.javascript_renderer - DEBUG - Driver creation attempt 1/3...
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - ✓ Chrome driver created successfully
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - ✓ Chrome driver created successfully
+2026-07-18 07:26:43,795 - app.javascript_renderer - INFO - [render_page] Starting - Loading URL: https://httpbin.org/html
+2026-07-18 07:26:43,795 - app.javascript_renderer - DEBUG - [render_page] Driver session: 575a099e9d6aceb0f6af782a003c7636
+2026-07-18 07:26:43,794 - app.javascript_renderer - INFO - [render_page] Starting - Loading URL: https://example.com
+2026-07-18 07:26:43,795 - app.javascript_renderer - DEBUG - [render_page] Driver session: d1bf96f5bca3ffae41addefe0ae7d216
+2026-07-18 07:26:43,801 - app.javascript_renderer - DEBUG - [render_page] Current URL before navigation: data:,
+2026-07-18 07:26:43,801 - app.javascript_renderer - DEBUG - [render_page] Current URL before navigation: data:,
+2026-07-18 07:26:43,801 - app.javascript_renderer - DEBUG - [render_page] Calling driver.get('https://example.com')...
+2026-07-18 07:26:43,801 - app.javascript_renderer - DEBUG - [render_page] Calling driver.get('https://httpbin.org/html')...
+2026-07-18 07:26:43,918 - app.javascript_renderer - INFO - [render_page] ✓ Navigation completed in 0.12s
+2026-07-18 07:26:43,921 - app.javascript_renderer - DEBUG - [render_page] Current URL after navigation: https://httpbin.org/html
+2026-07-18 07:26:43,924 - app.javascript_renderer - DEBUG - [render_page] Page title: '503 Service Temporarily Unavailable'
+2026-07-18 07:26:43,926 - app.javascript_renderer - DEBUG - [render_page] Found 0 cookies on page
+2026-07-18 07:26:43,926 - app.javascript_renderer - DEBUG - [render_page] Waiting for content with config: {'type': 'time', 'value': 1}
+2026-07-18 07:26:43,926 - app.javascript_renderer - DEBUG - _wait_for_content() - Waiting with type=time, timeout=10
+2026-07-18 07:26:43,926 - app.javascript_renderer - DEBUG - _wait_for_content() - Time-based wait for 1 seconds
+2026-07-18 07:26:44,321 - app.javascript_renderer - INFO - [render_page] ✓ Navigation completed in 0.52s
+2026-07-18 07:26:44,326 - app.javascript_renderer - DEBUG - [render_page] Current URL after navigation: https://example.com/
+2026-07-18 07:26:44,332 - app.javascript_renderer - DEBUG - [render_page] Page title: 'Example Domain'
+2026-07-18 07:26:44,334 - app.javascript_renderer - DEBUG - [render_page] Found 0 cookies on page
+2026-07-18 07:26:44,334 - app.javascript_renderer - DEBUG - [render_page] Waiting for content with config: {'type': 'time', 'value': 1}
+2026-07-18 07:26:44,334 - app.javascript_renderer - DEBUG - _wait_for_content() - Waiting with type=time, timeout=10
+2026-07-18 07:26:44,334 - app.javascript_renderer - DEBUG - _wait_for_content() - Time-based wait for 1 seconds
+2026-07-18 07:26:44,931 - app.javascript_renderer - DEBUG - [render_page] ✓ Wait completed
+2026-07-18 07:26:44,936 - app.javascript_renderer - INFO - [render_page] ✓ Page render successful (161 bytes)
+2026-07-18 07:26:44,939 - __main__ - DEBUG - extract_js() - Initial HTML size: 161 bytes
+2026-07-18 07:26:44,939 - __main__ - DEBUG - extract_js() - Executing 0 actions
+2026-07-18 07:26:44,940 - __main__ - DEBUG - extract_js() - Final HTML size: 161 bytes
+2026-07-18 07:26:45,056 - app.javascript_renderer - DEBUG - Driver closed cleanly
+2026-07-18 07:26:45,056 - __main__ - DEBUG - extract_js() - Parsing HTML with BeautifulSoup
+2026-07-18 07:26:45,057 - __main__ - DEBUG - extract_js() - Using extraction strategy: generic
+2026-07-18 07:26:45,057 - __main__ - DEBUG - extract_js() - Starting data extraction
+2026-07-18 07:26:45,057 - __main__ - DEBUG - extract_js() - Extraction complete, extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:45,057 - __main__ - INFO - Extracted 1 items from https://httpbin.org/html
+2026-07-18 07:26:45,057 - __main__ - INFO - Finished request on domain: httpbin.org
+2026-07-18 07:26:45,339 - app.javascript_renderer - DEBUG - [render_page] ✓ Wait completed
+2026-07-18 07:26:45,344 - app.javascript_renderer - INFO - [render_page] ✓ Page render successful (544 bytes)
+2026-07-18 07:26:45,346 - __main__ - DEBUG - extract_js() - Initial HTML size: 544 bytes
+2026-07-18 07:26:45,346 - __main__ - DEBUG - extract_js() - Executing 0 actions
+2026-07-18 07:26:45,348 - __main__ - DEBUG - extract_js() - Final HTML size: 544 bytes
+2026-07-18 07:26:45,450 - app.javascript_renderer - DEBUG - Driver closed cleanly
+2026-07-18 07:26:45,450 - __main__ - DEBUG - extract_js() - Parsing HTML with BeautifulSoup
+2026-07-18 07:26:45,450 - __main__ - DEBUG - extract_js() - Using extraction strategy: generic
+2026-07-18 07:26:45,450 - __main__ - DEBUG - extract_js() - Starting data extraction
+2026-07-18 07:26:45,451 - __main__ - DEBUG - extract_js() - Extraction complete, extracted keys: ['title', 'headings', 'paragraphs', 'images', 'meta_description', 'meta_keywords']
+2026-07-18 07:26:45,451 - __main__ - INFO - Extracted 1 items from https://example.com
+2026-07-18 07:26:45,451 - __main__ - INFO - Finished request on domain: example.com
